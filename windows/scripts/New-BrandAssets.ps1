@@ -27,7 +27,7 @@ if (-not $RepoRoot) {
     $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 }
 if (-not $SourcePng) {
-    $SourcePng = Join-Path $RepoRoot 'Itsycal\AppIcon.icon\Assets\AppIcon512@2x.png'
+    $SourcePng = Join-Path $RepoRoot 'windows\src\ItsycalForWindows\Assets\SourceIcon.png'
 }
 if (-not (Test-Path $SourcePng)) {
     throw "Source icon not found: $SourcePng"

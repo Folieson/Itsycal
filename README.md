@@ -3,19 +3,23 @@
 A calendar for the **Windows PowerToys Command Palette Dock** — the closest Windows
 equivalent of [ItsyCal](https://github.com/sfsam/itsycal)'s menu-bar calendar.
 
-This repository is a fork of [sfsam/itsycal](https://github.com/sfsam/itsycal). The macOS
-application is upstream and untouched; the Windows product lives in `windows/`.
+This repository contains the Windows application only. It is derived from the MIT-licensed
+[ItsyCal](https://github.com/sfsam/itsycal) project by Sam Vermette and contributors; the
+original macOS sources remain available upstream and in this repository's git history. The
+fork relation is kept for attribution and history, not for shared code.
 
 ## Features
 
-- **Date in the Dock** — an always-visible band at the screen edge showing today's date;
-  refreshes automatically across midnight.
+- **Date in the Dock** — an always-visible band at the screen edge showing today's date,
+  refreshed automatically across midnight.
 - **Month calendar** — one click opens a flyout with a 6×7 month grid, today highlighted,
   adjacent-month days dimmed, and previous/next/today navigation.
-- **ISO week numbers** — optional week-number column (ISO-8601).
-- **Events** — read-only events from the local Windows calendar for the visible range, with
+- **Day selection** — click a day to see that day's events; the selected day is highlighted.
+- **Events** — read-only events from the local Windows calendar, with time ranges, location,
   all-day and multi-day handling; the calendar keeps working when no calendar is configured.
-- **Settings** — first day of the week and week-number visibility.
+- **ISO week numbers** — optional week-number column (ISO-8601).
+- **Settings** — dock date format, event indicator, first day of the week, week numbers,
+  applied without restarting the extension.
 - **Private by design** — no network calls, no telemetry, calendar data never leaves the
   machine.
 
@@ -25,51 +29,55 @@ application is upstream and untouched; the Windows product lives in `windows/`.
 |---|---|
 | Windows | 10 2004 (build 19041) or newer |
 | PowerToys | 0.102 or newer, with Command Palette enabled |
-| Runtime | none separate — the .NET 10 runtime is inside the MSIX package |
+
+The MSIX package carries the .NET runtime it needs; no separate runtime installation is
+required.
 
 ## Install
 
-Itsycal for Windows is distributed as a signed MSIX package from
-[GitHub Releases](https://github.com/Folieson/Itsycal/releases/latest). Download the asset
-for your architecture and register it:
+A public release requires an MSIX signed with a certificate Windows trusts. Until the
+project's signing certificate is in place, the supported path is a development build:
 
-```powershell
-# download ItsycalForWindows_<package-version>_x64.msix (or _arm64.msix) from the
-# latest release, then register it:
-Add-AppxPackage .\ItsycalForWindows_1.0.0.0_x64.msix
-```
+1. Download the `itsycal-for-windows-dev` artifact from a successful
+   [windows-build run](https://github.com/Folieson/Itsycal/actions/workflows/windows-build.yml).
+2. From an **elevated** PowerShell, trust the development certificate and register the
+   package:
 
-Once the WinGet manifest is accepted, the same release installs with:
+   ```powershell
+   Import-Certificate -FilePath .\devcert.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+   Add-AppxPackage -Path .\ItsycalForWindows_1.0.0.0_x64_Debug.msix
+   ```
 
-```powershell
-winget install Folieson.ItsycalForWindows
-```
+3. Open **Command Palette → Dock settings** and enable the **Itsycal for Windows** band.
 
-Then open **Command Palette → Dock settings** and enable the **Itsycal for Windows** band.
+After the signing certificate exists, `winget install Folieson.ItsycalForWindows` becomes the
+primary path; the staged WinGet manifests live in [`winget/`](winget) and
+[`docs/SIGNING.md`](docs/SIGNING.md) explains the free options for open-source signing.
 
-Command Palette discovers extensions only through the MSIX app-extension catalog, so there
-is no portable/unpackaged installer. Development (self-signed) packages need their `.cer`
-trusted first; see [windows/README.md](windows/README.md).
+## Screenshots
+
+<!-- Screenshots are added by the maintainer after the end-to-end UI check. -->
+
+_Placeholder: dock band, month flyout and settings page screenshots land here._
 
 ## Build from source
 
-Requires the .NET 10 SDK and the Windows SDK; MSIX packaging additionally needs the Windows
-Application Packaging tooling from Visual Studio.
+Requires the .NET 10 SDK, the Windows SDK 10.0.26100 and Visual Studio Build Tools for MSIX
+packaging.
 
 ```powershell
 dotnet build windows/ItsycalForWindows.sln -c Debug -p:Platform=x64
 dotnet test  windows/tests/ItsycalForWindows.Tests.csproj -c Debug
 ```
 
-Development install (MSIX, elevated shell) and the signed release build are described in
-[windows/README.md](windows/README.md); signing options and the WinGet submission process
-are in [docs/SIGNING.md](docs/SIGNING.md).
+Release packaging and signing are described in [windows/README.md](windows/README.md) and
+implemented by [windows/scripts/Build-Release.ps1](windows/scripts/Build-Release.ps1).
 
 ## Configuration
 
-The extension shows a settings page inside Command Palette: open the extension's commands
-and choose **Settings** to switch the first day of the week or show ISO week numbers.
-Settings are stored by Command Palette.
+Open the extension's command in Command Palette and choose **Settings** to configure the
+dock date format, event indicator, first day of the week and ISO week numbers. Settings are
+stored by Command Palette.
 
 ## Privacy
 
@@ -82,21 +90,20 @@ capability in the package manifest.
 
 | Path | Purpose |
 |---|---|
-| `windows/` | Windows extension source, tests, build scripts. |
-| `windows/src/ItsycalForWindows/` | The Command Palette extension (C#, .NET 10). |
+| `windows/` | Windows extension source, tests, build and release scripts. |
+| `windows/src/ItsycalForWindows/` | The Command Palette extension (C#, .NET 10, MSIX). |
 | `windows/tests/` | Unit tests for the pure calendar/event logic. |
-| `winget/` | WinGet manifests for the signed MSIX release. |
-| `docs/` | Architecture decision records and the signing/distribution guide. |
-| `Itsycal/`, `Itsycal.xcodeproj/`, … | Upstream macOS application (unchanged). |
+| `winget/` | WinGet manifests for the MSIX release. |
+| `docs/adr/` | Architecture decision records. |
+| `docs/SIGNING.md` | Code-signing options and release secrets. |
 
 ## Contributing
 
-Contributions are welcome. Read [AGENTS.md](AGENTS.md) for repository rules (they apply to
-human and AI contributors alike), then open a pull request using the template. Please keep
-Windows changes inside `windows/` and leave the macOS sources untouched.
+Read [AGENTS.md](AGENTS.md) for repository rules (human and AI contributors alike) and
+[CONTRIBUTING.md](CONTRIBUTING.md), then open a pull request using the template.
 
 ## License
 
-MIT, same as upstream ItsyCal. See [LICENSE.txt](LICENSE.txt). The Windows port derives its
-extension skeleton from the Microsoft PowerToys template; see
-[windows/THIRD-PARTY-NOTICES.md](windows/THIRD-PARTY-NOTICES.md).
+MIT. See [LICENSE.txt](LICENSE.txt) — it retains the upstream ItsyCal copyright. The Windows
+extension skeleton is derived from the Microsoft PowerToys template; see
+[windows/THIRD-PARTY-NOTICES.md](windows/THIRD-PARTY-NOTICES.md) for details.
