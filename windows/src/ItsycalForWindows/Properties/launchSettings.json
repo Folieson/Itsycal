@@ -1,0 +1,11 @@
+﻿{
+  "profiles": {
+    "ItsycalForWindows (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "ItsycalForWindows (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

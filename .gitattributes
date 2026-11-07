@@ -1,0 +1,34 @@
+# Normalize text files to LF so the macOS sources and the Windows port share one history.
+* text=auto eol=lf
+
+*.sh      text eol=lf
+.githooks/* text eol=lf
+*.mjs     text eol=lf
+*.js      text eol=lf
+*.cs      text eol=lf
+*.csproj  text eol=lf
+*.props   text eol=lf
+*.json    text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.md      text eol=lf
+*.appxmanifest text eol=lf
+*.manifest text eol=lf
+
+# Windows-native artifacts keep CRLF.
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.sln text eol=crlf
+
+# Binary assets are never converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.msix binary
+*.cer binary
+*.pfx binary
