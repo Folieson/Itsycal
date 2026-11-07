@@ -74,9 +74,11 @@
   </Applications>
 
   <Capabilities>
-    <Capability Name="internetClient" />
     <rescap:Capability Name="runFullTrust" />
-    <!-- Read-only access to the local Windows appointment store (events). -->
-    <rescap:Capability Name="appointments" />
+    <!-- Read-only access to the local Windows appointment store (events).
+         The appointment store APIs are covered by the restricted capability
+         `appointmentsSystem`; `appointments` only covers provider dialogs such as
+         ShowAddAppointmentAsync. Sideloading does not require Store approval. -->
+    <rescap:Capability Name="appointmentsSystem" />
   </Capabilities>
 </Package>
