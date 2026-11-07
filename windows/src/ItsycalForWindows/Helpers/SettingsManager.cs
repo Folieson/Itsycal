@@ -15,13 +15,13 @@ internal sealed partial class SettingsManager : JsonSettingsManager
     private static readonly string _namespace = "ItsycalForWindows";
 
     private readonly ToggleSetting _weekStartsOnMonday = new(
-        Namespaced(nameof(WeekStartsOnMonday)),
+        Namespaced("WeekStartsOnMonday"),
         "Week starts on Monday",
         "Use Monday as the first day of the week in the calendar grid.",
         CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek == DayOfWeek.Monday);
 
     private readonly ToggleSetting _showWeekNumbers = new(
-        Namespaced(nameof(ShowWeekNumbers)),
+        Namespaced("ShowWeekNumbers"),
         "Show ISO week numbers",
         "Show a week-number column in the month grid.",
         false);
