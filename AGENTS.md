@@ -1,115 +1,56 @@
 # AGENTS.md
 
-Project instructions for AI agents. DeepSeek Harness loads this file for every session in
-this repository, after the user-global `~/.dsh/AGENTS.md`. Nested files are more specific:
-`windows/AGENTS.md` governs the Windows port. System, developer, and direct user
-instructions always win.
+Contributor rules for AI coding agents working in this repository. This repository is a
+fork of [ItsyCal](https://github.com/sfsam/itsycal) that adds **Itsycal for Windows**, a
+PowerToys Command Palette extension. A subset of the rules applies to the upstream macOS
+sources, which are kept intact.
 
-## What this repository is
+## Layout
 
-`Folieson/Itsycal` is a **fork** of [sfsam/itsycal](https://github.com/sfsam/itsycal) — a
-macOS menu-bar calendar written in Objective-C — plus a Windows implementation:
-
-- **Upstream macOS app** (root, `Itsycal/`, `Itsycal.xcodeproj/`, `Design/`): reference
-  implementation and the source of the product's behaviour and look. Keep it intact.
-- **`windows/`** — **Itsycal for Windows**: a PowerToys Command Palette extension
-  (C#/.NET 10, MSIX) that puts a calendar in the Command Palette Dock, the Windows
-  equivalent of a menu-bar widget.
-
-Both are MIT licensed; see `LICENSE.txt` and `windows/THIRD-PARTY-NOTICES.md`.
-
-## Repository map
-
-| Path | Purpose |
-|---|---|
-| `windows/` | Everything for the Windows port: solution, extension source, docs, tests. |
-| `windows/AGENTS.md` | Extension-specific invariants (COM server, CLSID, dock bands, packaging). |
-| `windows/src/ItsycalForWindows/` | The CmdPal extension project. |
-| `windows/docs/cmdpal-extension-reference.md` | Command Palette extension API reference (from the PowerToys MIT template). |
-| `.agents/skills/` | Local skills: `git-*`, `agent-notes`, and CmdPal skills (`add-dock-band`, `add-adaptive-card-form`, `add-extension-settings`, `add-fallback-commands`, `publish-extension`). |
-| `.agents/agents/` | Delegation role cards: `lead`, `implementer`, `reviewer`, `researcher`, `verifier`. |
-| `.agents/notes/` | Decision records: `<status>/<kind>/<YYYY-MM-DD>-<slug>.md`. |
-| `.githooks/` | Conventional Commits, staged-content safety, and `main` force-push/deletion guards. |
-| `scripts/scaffold-check.mjs` | Validates skills, roles, notes, AGENTS.md budget, and the CmdPal manifest/CLSID wiring. |
-| `.github/workflows/windows-build.yml` | CI: Windows build and scaffold validation. |
+- `windows/` — the Windows extension: C#/.NET 10, Command Palette dock band + calendar.
+- `windows/src/ItsycalForWindows/` — extension source (`Program.cs`, provider, `Models/`,
+  `Pages/`, `Services/`, package assets).
+- `windows/tests/` — unit tests for the pure logic (calendar grid, event ranges).
+- `installer/` — Inno Setup script used for the WinGet release.
+- `docs/` — architecture decision records and screenshots.
+- Everything else at the repository root is upstream ItsyCal (Objective-C, macOS).
 
 ## Hard rules
 
-- **Windows changes stay in `windows/`.** Do not edit the macOS sources to implement
-  Windows behaviour. If upstream behaviour matters, cite the exact upstream path in the
-  PR or a decision record instead.
-- **Do not break upstream mergeability.** Never rewrite upstream files or history; keep
-  additions in new paths. Never force-push `master` or `main`.
-- **Keep the manifest wiring consistent.** The extension CLSID must match in
-  `ItsycalForWindows.cs` (`[Guid]`), `Package.appxmanifest` (`com:Class Id` and
-  `CreateInstance ClassId`). `scripts/scaffold-check.mjs` fails on a mismatch.
-- **Never change the COM hosting pattern** in `Program.cs`; extensions run out-of-process
-  and the host depends on `-RegisterProcessAsComServer`.
-- **MSIX identity is release-sensitive.** Changing `Identity Name`, `Publisher`, or the
-  version requires re-signing and reinstalling; record the reason in a decision record.
-- **No secrets, no telemetry.** Calendar data stays on the machine; the extension reads
-  the local Windows appointment store and sends nothing. Never add analytics.
-- **Verify before claiming.** A UI claim needs a build plus an installed-package check;
-  state explicitly what was verified and what was not.
-- **One writer per path.** When several agents work, split write scopes and use worktrees.
+- Windows behaviour changes go in `windows/`. Do not modify the macOS sources; keep the
+  fork mergeable with upstream.
+- The extension is an out-of-process COM server. Keep `Program.cs`'s
+  `-RegisterProcessAsComServer` branch intact; the CLSID must stay identical in
+  `ItsycalForWindows.cs`, `Package.appxmanifest` (`com:Class Id`, `CreateInstance ClassId`)
+  and `installer/setup.iss`.
+- Never commit `bin/`, `obj/`, generated packages, certificates, `*.msix`, or `publish/`
+  output.
+- Do not add telemetry or network calls. Calendar data never leaves the machine; do not log
+  event titles.
+- Ask before changing the MSIX identity (`Name`, `Publisher`, version) or the WinGet
+  package identifier — both are release-sensitive.
+- Verify before reporting: a build/`dotnet test` exit code is evidence; "should work" is
+  not. For UI claims, state what was actually observed.
 
-## Build and verification
-
-Requires the .NET 10 SDK (`dotnet --version` → 10.0.x), Windows 10 2004+ and, for a
-visible result, PowerToys 0.102+ with Command Palette enabled.
+## Build and verify
 
 ```powershell
-# From the repository root
 dotnet build windows/ItsycalForWindows.sln -c Debug -p:Platform=x64
-node scripts/scaffold-check.mjs
-git config core.hooksPath .githooks   # once per clone
+dotnet test windows/tests/ItsycalForWindows.Tests.csproj -c Debug
 ```
 
-- Build only the project you changed; a clean build must exit `0`.
-- The MSIX package is produced by the same build when `EnableMsixTooling` applies; see
-  `windows/README.md` for installation and the PowerToys Reload step.
-- Report exact commands and exit codes. "Looks fine" is not verification.
+- The default build is the MSIX development package; the WinGet release builds unpackaged
+  (`-p:WindowsPackageType=None`) and wraps the output with Inno Setup — see
+  `windows/README.md`.
+- The release pipeline is `.github/workflows/release.yml`; CI builds and tests every PR.
 
-## Workflow
+## Commits and PRs
 
-1. Branch from `master`: `feat/<slug>`, `fix/<slug>`, `docs/<slug>`, `chore/<slug>`.
-2. Commits: Conventional Commits; the `commit-msg` hook and CI enforce the header.
-3. PRs target `master`, follow `.github/pull_request_template.md` if present, and include
-   verification evidence. Keep one logical change per PR.
-4. Parallel writers: create a checked-out branch per writer with
-   `git worktree add ..\wt-<slug> -b <branch>` from this repository; never share one
-   checkout between two writers.
-5. Review with `.agents/agents/reviewer.md`; merge only when CI is green.
+Conventional Commits (`feat(windows): ...`, `fix(windows): ...`, `docs: ...`), one logical
+change per PR, PR description with the exact verification commands and results. Keep
+`docs/adr/` up to date when a decision changes.
 
-## Delegation
+## Decision records
 
-Role cards are in `.agents/agents/`. Compose a delegation prompt as: role card + task +
-write scope (paths) + base branch + acceptance criteria + required report format. The Lead
-owns integration, git state changes, and the final answer.
-
-Recommended split for this repository: one writer for `Models/` + `Pages/`, one for
-`Services/` + manifest capabilities, the Lead for `Program.cs`, provider wiring, packaging
-and docs.
-
-## Decision records and skills
-
-- Cross-cutting or non-obvious choices get a note in `.agents/notes/` (path format above,
-  template in `.agents/notes/TEMPLATE.md`, procedure in `.agents/skills/agent-notes/`).
-- Use the local skills before inventing procedures: git work, decision records, and
-  Command Palette patterns (`add-dock-band` for Dock widgets, `add-adaptive-card-form` for
-  card UI, `add-extension-settings` for settings).
-- Keep `AGENTS.md` under the 65,536-byte instruction budget; files under 16 KB are the
-  practical target.
-
-## Project facts
-
-- Upstream: `sfsam/itsycal` (Objective-C, MIT); fork: `Folieson/Itsycal` (public).
-- Windows product name: **Itsycal for Windows**.
-- Extension identity: `ItsycalForWindows`, CLSID `D13947EE-B1EE-461A-8160-EDCAAA65A3AA`.
-- Target framework: `net10.0-windows10.0.26100.0`; platform `x64` (ARM64 kept in config).
-- Command Palette SDK: `Microsoft.CommandPalette.Extensions` 0.11.x (PowerToys 0.102).
-- CI: `.github/workflows/windows-build.yml` (windows-latest, .NET 10, build + scaffold
-  check). Every run uploads the signed `itsycal-for-windows-dev` artifact (MSIX + `.cer`).
-- Install: elevated `scripts/deploy-local.ps1 -MsixPath <msix> -CertPath <cer>`; the script
-  trusts the development certificate machine-wide and restarts Command Palette.
-- Commit identity: repository-local `user.name` / `user.email` (GitHub noreply).
+Architecture decisions live in `docs/adr/` (`NNNN-kebab-title.md`). This repository
+previously used an agent-owned note directory; decisions were moved to ADR format.

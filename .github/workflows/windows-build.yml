@@ -107,6 +107,3 @@ jobs:
             windows/artifacts/**/*.cer
             windows/artifacts/package-path.txt
           if-no-files-found: error
-
-      - name: Validate agent scaffold
-        run: node scripts/scaffold-check.mjs

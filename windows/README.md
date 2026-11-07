@@ -1,104 +1,80 @@
-# Itsycal for Windows
+# Itsycal for Windows — extension source
 
-A calendar for the Windows **PowerToys Command Palette Dock** — the closest Windows
-equivalent of [ItsyCal](https://github.com/sfsam/itsycal)'s menu-bar calendar. This is the
-Windows half of the `Folieson/Itsycal` fork; the upstream macOS application is untouched.
+This folder contains the Windows product: a PowerToys Command Palette extension written in
+C#/.NET 10. It contributes a dock band with the current date and a flyout month calendar
+with read-only events from the Windows appointment store.
 
-## What it does
+## Prerequisites
 
-- Adds a dock band to the PowerToys Command Palette Dock showing today's date.
-- Opens a flyout with a month grid: current month, today highlighted, previous/next month
-  and "Today".
-- Shows the day's events from the local Windows calendar (read-only), with an explicit
-  empty state when no calendar is configured or accessible.
-- Stays out of the way: no windows, no tray icon, no network access, no telemetry.
-
-The goal is feature parity in spirit, not a line-by-line port: ItsyCal is Objective-C and
-macOS-only, so the Windows implementation is a new C# extension built on the
-[Command Palette extension SDK](https://learn.microsoft.com/windows/powertoys/command-palette/extension-development).
-
-## Requirements
-
-| Requirement | Version |
+| Tool | Purpose |
 |---|---|
-| Windows | 10 2004 (build 19041) or newer |
-| PowerToys | 0.102 or newer, with Command Palette enabled |
-| .NET SDK (build only) | 10.0.x |
-| Platform | `x64` (ARM64 project configuration exists but is unverified) |
+| .NET 10 SDK (10.0.x) | build, tests, publish |
+| Windows SDK 10.0.26100 | CsWinRT projection and MSIX packaging |
+| PowerToys 0.102+ | Command Palette host |
+| Inno Setup 6 (release only) | WinGet installer packaging |
 
-## Build
+## Build and test
 
 ```powershell
-# From the repository root
-dotnet restore windows/ItsycalForWindows.sln
+# from the repository root
 dotnet build windows/ItsycalForWindows.sln -c Debug -p:Platform=x64
+dotnet test  windows/tests/ItsycalForWindows.Tests.csproj -c Debug
 ```
 
-Output lands under `windows/src/ItsycalForWindows/bin/x64/Debug/`.
-
-## Install for development
-
-The extension is a packaged COM server, so a plain build is not enough — the MSIX package
-must be registered with a certificate the machine trusts.
-
-The supported path on a machine without the Windows SDK (the normal case when the package
-is built in CI):
-
-1. Take the `itsycal-for-windows-dev` artifact from the latest successful
-   `windows-build` run (`gh run download <run-id> -n itsycal-for-windows-dev -D .\pkg`).
-   It contains a signed `ItsycalForWindows_*.msix` and the matching `devcert.cer`.
-2. Run the installer from an **elevated** PowerShell:
-
-   ```powershell
-   .\scripts\deploy-local.ps1 -MsixPath .\pkg\ItsycalForWindows_*.msix -CertPath .\pkg\devcert.cer
-   ```
-
-   The script trusts the development certificate in `LocalMachine\TrustedPeople`, registers
-   the package, and restarts Command Palette.
-3. Enable the **Itsycal for Windows** band in the Command Palette Dock settings.
-
-Building and packaging locally (needs the Windows SDK and .NET 10 SDK):
+The default configuration builds the **MSIX development package** (useful for local
+installation and debugging). The WinGet release builds **unpackaged**:
 
 ```powershell
-dotnet build windows/ItsycalForWindows.sln -c Debug -p:Platform=x64 -p:GenerateAppxPackageOnBuild=true
-Add-AppxPackage -Path <generated .msix>   # after trusting the signing certificate
+dotnet publish windows/src/ItsycalForWindows/ItsycalForWindows.csproj `
+  -c Release -r win-x64 --self-contained false `
+  -p:WindowsPackageType=None -p:EnableMsixTooling=false -o publish/x64
 ```
 
-The development certificate is ephemeral (one per CI run), so a package from an older run
-must be re-trusted with its own `.cer`.
+`installer/setup.iss` wraps that output into `ItsycalForWindows_<version>_<arch>.exe` and
+registers the COM server under `HKCU`, which is what the WinGet manifest points at.
+
+## Install a development build (MSIX)
+
+MSIX sideloading trust is machine-wide, so the development installer must run elevated:
+
+```powershell
+# 1. download the artifact from the latest CI run
+gh run download <run-id> -n itsycal-for-windows-dev -D .\pkg
+
+# 2. install (elevated PowerShell)
+.\windows\scripts\deploy-local.ps1 -MsixPath .\pkg\ItsycalForWindows_*.msix -CertPath .\pkg\devcert.cer
+```
+
+The development certificate is ephemeral (one per CI run); re-trust the matching `.cer` when
+you install a package from a different run.
+
+## Source map
+
+| Path | Purpose |
+|---|---|
+| `src/ItsycalForWindows/Program.cs` | Out-of-process COM server host. Do not change the hosting pattern. |
+| `src/ItsycalForWindows/ItsycalForWindows.cs` | `IExtension` implementation; carries the CLSID. |
+| `src/ItsycalForWindows/ItsycalForWindowsCommandsProvider.cs` | Commands, dock band, cached page instance. |
+| `src/ItsycalForWindows/Models/` | Calendar month grid, week rows, day/event models (pure logic). |
+| `src/ItsycalForWindows/Pages/` | Dock item and Adaptive Card calendar flyout. |
+| `src/ItsycalForWindows/Services/` | Appointment-store access and event range helpers. |
+| `tests/` | Unit tests for the pure logic. |
+| `scripts/` | Development tooling (MSIX install script, icon generation). |
+| `Package.appxmanifest` | MSIX identity, COM server, CmdPal app extension, `appointmentsSystem` capability. |
 
 ## Events and privacy
 
-Events come from the Windows appointment store through the read-only
-`Windows.ApplicationModel.Appointments` API. The extension never writes to the calendar,
-never sends data anywhere, and degrades to a calendar without events when access is
-unavailable. No analytics or logging of event contents exists.
+Events come from `Windows.ApplicationModel.Appointments` in read-only mode
+(`AppointmentStoreAccessType.AllCalendarsReadOnly`). The extension never writes to the
+calendar, makes no network calls, and logs no event content. Without the capability, a
+packaged run simply shows no events; the calendar still works.
 
-## Limitations
+## Troubleshooting
 
-- Events require the packaged identity to declare the `appointments` capability; an
-  unpackaged debug run shows no events.
-- The Dock layout (position, pinning) is configured in PowerToys, not by this extension.
-- Localization exists only for English so far.
-
-## Layout
-
-```
-windows/
-  ItsycalForWindows.sln
-  Directory.Build.props / Directory.Packages.props / nuget.config
-  docs/cmdpal-extension-reference.md      # API reference from the PowerToys MIT template
-  src/ItsycalForWindows/
-    Program.cs                            # COM server host
-    ItsycalForWindows.cs                  # IExtension implementation (CLSID)
-    ItsycalForWindowsCommandsProvider.cs  # commands + dock bands
-    Models/                               # month grid, days, events
-    Pages/                                # calendar flyout pages
-    Services/                             # appointment store access
-    Assets/                               # package logos
-    Package.appxmanifest                  # identity, COM server, CmdPal app extension
-```
-
-## License
-
-MIT, like upstream ItsyCal. See `../LICENSE.txt` and `THIRD-PARTY-NOTICES.md`.
+- **Band not visible** — enable it in Command Palette → Dock settings; the host persists the
+  selection per user.
+- **Extension not listed** — restart Command Palette (or `Reload` → “Reload Command Palette
+  extensions”); for unpackaged installs check `HKCU\Software\Classes\CLSID\{D13947EE-B1EE-461A-8160-EDCAAA65A3AA}`.
+- **No events** — the appointment store is empty, no calendar account is configured, or the
+  app is running unpackaged without the `appointmentsSystem` capability (the last case is
+  expected for a plain `dotnet run`).
