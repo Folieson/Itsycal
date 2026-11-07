@@ -105,23 +105,19 @@ internal sealed partial class CalendarPage : ContentPage
         CalendarForm form;
         lock (_sync)
         {
-            form = new CalendarForm { TemplateJson = _renderedTemplate };
+            form = new CalendarForm(HandleFormSubmit) { TemplateJson = _renderedTemplate };
             _currentForm = form;
         }
 
         return [form];
     }
 
-    public override ICommandResult SubmitForm(string inputs) => HandleFormSubmit(inputs, data: null);
-
-    public override ICommandResult SubmitForm(string inputs, string data) => HandleFormSubmit(inputs, data);
-
     /// <summary>
     /// Handles the card's Action.Submit buttons. The host passes the action's <c>data</c>
     /// object as the second argument (the installed FormContent API exposes
     /// <c>SubmitForm(inputs, data)</c>); reading the same key from <paramref name="inputs"/>
     /// as a fallback keeps navigation working if a host merges the action data into the
-    /// input payload instead.
+    /// input payload instead. Invoked by <see cref="CalendarForm"/>.
     /// </summary>
     private CommandResult HandleFormSubmit(string inputs, string? data)
     {
@@ -361,22 +357,19 @@ internal sealed partial class CalendarPage : ContentPage
 
         var body = new JsonArray
         {
-            new JsonObject
-            {
-                ["type"] = "TextBlock",
-                ["text"] = Literal(month.Title),
-                ["size"] = "large",
-                ["weight"] = "bolder",
-                ["style"] = "heading",
-                ["horizontalAlignment"] = "center",
-                ["wrap"] = true,
-            },
-            BuildWeekdayHeader(gridMonth.WeekStart, showWeekNumbers),
+            (JsonNode)TextBlock(
+                month.Title,
+                size: "large",
+                weight: "bolder",
+                style: "heading",
+                alignment: "center",
+                wrap: true),
+            (JsonNode)BuildWeekdayHeader(gridMonth.WeekStart, showWeekNumbers),
         };
 
         foreach (var week in gridMonth.Weeks)
         {
-            body.Add(BuildWeekRow(week, showWeekNumbers));
+            body.Add((JsonNode)BuildWeekRow(week, showWeekNumbers));
         }
 
         AddEventsSection(body, events, showLoading);
@@ -391,9 +384,9 @@ internal sealed partial class CalendarPage : ContentPage
             ["body"] = body,
             ["actions"] = new JsonArray
             {
-                BuildNavigationAction(PreviousMonthLabel, PreviousMonthAction, "nav-previous"),
-                BuildNavigationAction(TodayLabel, TodayAction, "nav-today"),
-                BuildNavigationAction(NextMonthLabel, NextMonthAction, "nav-next"),
+                (JsonNode)BuildNavigationAction(PreviousMonthLabel, PreviousMonthAction, "nav-previous"),
+                (JsonNode)BuildNavigationAction(TodayLabel, TodayAction, "nav-today"),
+                (JsonNode)BuildNavigationAction(NextMonthLabel, NextMonthAction, "nav-next"),
             },
         };
 
@@ -405,14 +398,14 @@ internal sealed partial class CalendarPage : ContentPage
         var columns = new JsonArray();
         if (showWeekNumbers)
         {
-            columns.Add(BuildColumn("auto", TextBlock(WeekNumberHeader, color: "light", weight: "bolder", alignment: "center")));
+            columns.Add((JsonNode)BuildColumn("auto", TextBlock(WeekNumberHeader, color: "light", weight: "bolder", alignment: "center")));
         }
 
         var shortestDayNames = CultureInfo.CurrentCulture.DateTimeFormat.ShortestDayNames;
         for (var column = 0; column < WeekRow.DayCount; column++)
         {
             var dayOfWeek = (DayOfWeek)(((int)weekStart + column) % WeekRow.DayCount);
-            columns.Add(BuildColumn("stretch", TextBlock(shortestDayNames[(int)dayOfWeek], color: "light", weight: "bolder", alignment: "center")));
+            columns.Add((JsonNode)BuildColumn("stretch", TextBlock(shortestDayNames[(int)dayOfWeek], color: "light", weight: "bolder", alignment: "center")));
         }
 
         return new JsonObject
@@ -427,7 +420,7 @@ internal sealed partial class CalendarPage : ContentPage
         var columns = new JsonArray();
         if (showWeekNumbers)
         {
-            columns.Add(BuildColumn(
+            columns.Add((JsonNode)BuildColumn(
                 "auto",
                 TextBlock(week.IsoWeekNumber.ToString(CultureInfo.CurrentCulture), color: "light", alignment: "center")));
         }
@@ -449,7 +442,7 @@ internal sealed partial class CalendarPage : ContentPage
                 : day.Date.Day.ToString(CultureInfo.CurrentCulture);
             var weight = day.IsToday ? "bolder" : null;
 
-            columns.Add(BuildColumn("stretch", TextBlock(text, color: color, weight: weight, alignment: "center")));
+            columns.Add((JsonNode)BuildColumn("stretch", TextBlock(text, color: color, weight: weight, alignment: "center")));
         }
 
         return new JsonObject
@@ -461,31 +454,23 @@ internal sealed partial class CalendarPage : ContentPage
 
     private static void AddEventsSection(JsonArray body, IReadOnlyList<CalendarEvent> events, bool showLoading)
     {
-        body.Add(new JsonObject
-        {
-            ["type"] = "TextBlock",
-            ["text"] = EventsHeading,
-            ["size"] = "medium",
-            ["weight"] = "bolder",
-            ["spacing"] = "medium",
-            ["wrap"] = true,
-        });
+        body.Add((JsonNode)TextBlock(EventsHeading, size: "medium", weight: "bolder", spacing: "medium", wrap: true));
 
         if (showLoading)
         {
-            body.Add(TextBlock(LoadingEventsLabel, color: "light", wrap: true));
+            body.Add((JsonNode)TextBlock(LoadingEventsLabel, color: "light", wrap: true));
             return;
         }
 
         if (events.Count == 0)
         {
-            body.Add(TextBlock(NoEventsLabel, color: "light", wrap: true));
+            body.Add((JsonNode)TextBlock(NoEventsLabel, color: "light", wrap: true));
             return;
         }
 
         foreach (var item in events)
         {
-            body.Add(TextBlock(FormatEventLine(item), wrap: true));
+            body.Add((JsonNode)TextBlock(FormatEventLine(item), wrap: true));
         }
     }
 
@@ -561,14 +546,17 @@ internal sealed partial class CalendarPage : ContentPage
     {
         ["type"] = "Column",
         ["width"] = width,
-        ["items"] = new JsonArray { content },
+        ["items"] = new JsonArray { (JsonNode)content },
     };
 
     private static JsonObject TextBlock(
         string text,
         string? color = null,
         string? weight = null,
+        string? size = null,
+        string? style = null,
         string? alignment = null,
+        string? spacing = null,
         bool wrap = false)
     {
         var block = new JsonObject
@@ -588,9 +576,24 @@ internal sealed partial class CalendarPage : ContentPage
             block["weight"] = weight;
         }
 
+        if (size is not null)
+        {
+            block["size"] = size;
+        }
+
+        if (style is not null)
+        {
+            block["style"] = style;
+        }
+
         if (alignment is not null)
         {
             block["horizontalAlignment"] = alignment;
+        }
+
+        if (spacing is not null)
+        {
+            block["spacing"] = spacing;
         }
 
         return block;
@@ -605,16 +608,26 @@ internal sealed partial class CalendarPage : ContentPage
 }
 
 /// <summary>
-/// The single Adaptive Card the calendar page renders. The host subscribes to the form's
-/// property changes and re-renders when <see cref="FormContent.TemplateJson"/> changes, so
-/// navigation and background event loading only need to update the template.
+/// The Adaptive Card the calendar page hands to the host. <see cref="FormContent"/> owns the
+/// <c>SubmitForm</c> callbacks for the card's Action.Submit buttons, so the form forwards
+/// them to the page and the page owns month navigation. The host re-renders the card when
+/// <see cref="FormContent.TemplateJson"/> changes, so background event loading only needs to
+/// update the template.
 /// </summary>
 internal sealed partial class CalendarForm : FormContent
 {
-    public CalendarForm()
+    private readonly Func<string, string?, CommandResult> _submitForm;
+
+    public CalendarForm(Func<string, string?, CommandResult> submitForm)
     {
+        _submitForm = submitForm;
+
         // Binding data is unused; an empty object keeps the host's template expansion well
         // defined even though the card contains no ${...} placeholders.
         DataJson = "{}";
     }
+
+    public override ICommandResult SubmitForm(string inputs) => _submitForm(inputs, null);
+
+    public override ICommandResult SubmitForm(string inputs, string data) => _submitForm(inputs, data);
 }

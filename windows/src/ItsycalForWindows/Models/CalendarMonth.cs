@@ -124,7 +124,7 @@ public sealed class CalendarMonth
         return new CalendarMonth(Year, Month, _weekStart, days);
     }
 
-    private static IReadOnlyList<WeekRow> BuildWeeks(IReadOnlyList<CalendarDay> days, DayOfWeek weekStart)
+    private static List<WeekRow> BuildWeeks(IReadOnlyList<CalendarDay> days, DayOfWeek weekStart)
     {
         // ISO-8601 weeks start on Monday and are identified by the week containing the
         // first Thursday. Taking the number from the row's Monday cell keeps it correct
