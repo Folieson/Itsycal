@@ -5,6 +5,7 @@ on:
     branches: [master, main]
     paths:
       - 'windows/**'
+      - 'winget/**'
       - 'docs/**'
       - 'README.md'
       - 'AGENTS.md'
@@ -12,6 +13,7 @@ on:
   pull_request:
     paths:
       - 'windows/**'
+      - 'winget/**'
       - 'docs/**'
       - 'README.md'
       - 'AGENTS.md'
