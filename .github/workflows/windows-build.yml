@@ -83,6 +83,10 @@ jobs:
           Export-PfxCertificate -Cert $cert -FilePath 'windows\artifacts\devcert.pfx' -Password $secure | Out-Null
           Export-Certificate -Cert $cert -FilePath 'windows\artifacts\devcert.cer' | Out-Null
 
+          # Trust the ephemeral certificate in the runner's user store so the package can
+          # be verified after signing (the same step a developer runs locally).
+          Import-Certificate -FilePath 'windows\artifacts\devcert.cer' -CertStoreLocation 'Cert:\CurrentUser\TrustedPeople' | Out-Null
+
           & signtool sign /fd SHA256 /f 'windows\artifacts\devcert.pfx' /p $env:DEV_CERT_PASSWORD "$env:MSIX_PATH"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
