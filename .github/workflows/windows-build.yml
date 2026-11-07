@@ -56,6 +56,9 @@ jobs:
           -p:AppxPackageSigningEnabled=false
           -p:AppxPackageDir="${{ github.workspace }}\windows\artifacts\msix\"
 
+      - name: Run unit tests
+        run: dotnet test windows/tests/ItsycalForWindows.Tests/ItsycalForWindows.Tests.csproj -c Debug
+
       - name: Locate the MSIX package
         shell: pwsh
         run: |
