@@ -21,7 +21,8 @@
 # MSIX (not of the MSIX file itself).
 PackageIdentifier: Folieson.ItsycalForWindows
 PackageVersion: 1.0.0
-Platform: Windows.Desktop
+Platform:
+- Windows.Desktop
 MinimumOSVersion: 10.0.19041.0
 InstallerType: msix
 Scope: user

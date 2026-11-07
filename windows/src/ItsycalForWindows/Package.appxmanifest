@@ -12,9 +12,9 @@
     Name="ItsycalForWindows"
     Publisher="CN=ItsycalForWindows-Dev"
     Version="1.0.0.0" />
-  <!-- Development identity for the MSIX build. The WinGet release is unpackaged and is
-       registered by installer/setup.iss; change the Publisher only with a matching
-       signing certificate. -->
+  <!-- Development identity for the MSIX build. Public releases ship the same MSIX signed
+       with a trusted certificate; WinGet manifests live in winget/. Change the Publisher
+       only with a matching signing certificate. -->
 
   <Properties>
     <DisplayName>Itsycal for Windows</DisplayName>
