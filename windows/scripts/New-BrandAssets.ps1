@@ -6,7 +6,7 @@
 Regenerates the MSIX/EXE brand assets from the upstream ItsyCal app icon.
 
 .DESCRIPTION
-The upstream macOS icon lives in `Itsycal/AppIcon.icon/Assets/AppIcon512@2x.png` (MIT).
+The upstream macOS icon (MIT) is kept as `windows/src/ItsycalForWindows/Assets/SourceIcon.png`.
 This script resizes it into the exact asset names the package manifest, the executable and
 the Inno Setup installer expect. Run it after changing the source icon; commit the output.
 
@@ -27,7 +27,7 @@ if (-not $RepoRoot) {
     $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 }
 if (-not $SourcePng) {
-    $SourcePng = Join-Path $RepoRoot 'Itsycal\AppIcon.icon\Assets\AppIcon512@2x.png'
+    $SourcePng = Join-Path $RepoRoot 'windows\src\ItsycalForWindows\Assets\SourceIcon.png'
 }
 if (-not (Test-Path $SourcePng)) {
     throw "Source icon not found: $SourcePng"

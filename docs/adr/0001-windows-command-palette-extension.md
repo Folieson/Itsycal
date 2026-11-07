@@ -98,3 +98,8 @@ The MSIX-only route is not a preference; it is the only route that works:
 - [ ] Verify the arm64 MSIX on Windows on ARM hardware.
 - [ ] Localization beyond English.
 - [ ] Event reminders/alerts (ItsyCal parity); needs write access, out of scope for now.
+
+## Amendment 2026-11-07 — Windows-only repository
+
+The macOS application sources, Xcode project, design files, macOS build scripts and the Apple signing workflow were removed from this repository. The product repository now contains only the Windows extension, its tests, documentation and release tooling. Upstream remains at https://github.com/sfsam/itsycal and the fork relation plus the MIT copyright in `LICENSE.txt` preserve attribution; the removed sources stay in the git history. Rationale: the macOS code is not buildable or relevant here, and a lean repository is easier to review, release and submit to package managers.
+

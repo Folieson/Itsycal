@@ -16,7 +16,7 @@
 
 ## Checklist
 
-- [ ] Windows changes stay in `windows/`; upstream macOS sources untouched.
+- [ ] Changes stay inside `windows/` (or the matching docs); no macOS sources reintroduced.
 - [ ] CLSID is unchanged in `ItsycalForWindows.cs` and `Package.appxmanifest`.
 - [ ] No telemetry or network code; event content is not logged.
 - [ ] New NuGet packages are recorded in `windows/THIRD-PARTY-NOTICES.md`.
