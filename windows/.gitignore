@@ -3,6 +3,7 @@ bin/
 obj/
 AppPackages/
 BundleArtifacts/
+artifacts/
 Generated Files/
 *.msix
 *.msixbundle

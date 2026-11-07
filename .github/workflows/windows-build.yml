@@ -28,6 +28,8 @@ jobs:
   build:
     name: Build Windows extension
     runs-on: windows-latest
+    env:
+      DEV_CERT_PASSWORD: dsh-local-dev-cert
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -47,8 +49,64 @@ jobs:
       - name: Restore
         run: dotnet restore windows/ItsycalForWindows.sln -p:Platform=x64
 
-      - name: Build (Debug, x64)
-        run: dotnet build windows/ItsycalForWindows.sln -c Debug -p:Platform=x64 --no-restore
+      - name: Build and package MSIX (Debug, x64)
+        run: >
+          dotnet build windows/ItsycalForWindows.sln -c Debug -p:Platform=x64 --no-restore
+          -p:GenerateAppxPackageOnBuild=true
+          -p:AppxPackageSigningEnabled=false
+          -p:AppxPackageDir="${{ github.workspace }}\windows\artifacts\msix\"
+
+      - name: Locate the MSIX package
+        shell: pwsh
+        run: |
+          $msix = Get-ChildItem -Path 'windows\artifacts' -Recurse -Filter *.msix -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $msix) {
+            Write-Error 'No .msix package was produced by the build.'
+            exit 1
+          }
+          "PACKAGE=$($msix.FullName)" | Tee-Object -FilePath 'windows\artifacts\package-path.txt'
+          "MSIX_PATH=$($msix.FullName)" >> $env:GITHUB_ENV
+
+      - name: Sign the MSIX with an ephemeral development certificate
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate `
+            -Type Custom `
+            -Subject 'CN=ItsycalForWindows-Dev' `
+            -KeyUsage DigitalSignature `
+            -FriendlyName 'Itsycal for Windows dev signing' `
+            -CertStoreLocation 'Cert:\CurrentUser\My' `
+            -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}')
+
+          $secure = ConvertTo-SecureString -String $env:DEV_CERT_PASSWORD -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath 'windows\artifacts\devcert.pfx' -Password $secure | Out-Null
+          Export-Certificate -Cert $cert -FilePath 'windows\artifacts\devcert.cer' | Out-Null
+
+          # Trust the ephemeral certificate in the runner's user store so the package can
+          # be verified after signing (the same step a developer runs locally).
+          Import-Certificate -FilePath 'windows\artifacts\devcert.cer' -CertStoreLocation 'Cert:\CurrentUser\TrustedPeople' | Out-Null
+
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter 'signtool.exe' -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signtool) { Write-Error 'signtool.exe not found in the Windows SDK'; exit 1 }
+
+          & $signtool.FullName sign /fd SHA256 /f 'windows\artifacts\devcert.pfx' /p $env:DEV_CERT_PASSWORD "$env:MSIX_PATH"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output "Signed package: $env:MSIX_PATH"
+          Remove-Item 'windows\artifacts\devcert.pfx' -Force
+
+      - name: Upload the development package
+        uses: actions/upload-artifact@v4
+        with:
+          name: itsycal-for-windows-dev
+          path: |
+            windows/artifacts/**/*.msix
+            windows/artifacts/**/*.cer
+            windows/artifacts/package-path.txt
+          if-no-files-found: error
 
       - name: Validate agent scaffold
         run: node scripts/scaffold-check.mjs
