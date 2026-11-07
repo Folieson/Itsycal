@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Same target framework as the extension so the tests can reference the project and
+         the calendar logic is compiled against the same BCL/Windows SDK surface. The test
+         host itself needs neither MSIX nor WinRT metadata, so those tools are turned off. -->
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <!-- Must match the extension's projection package; otherwise referencing its
+         Microsoft.Windows.SDK.NET.dll fails with NETSDK1148. -->
+    <WindowsSdkPackageVersion>10.0.26100.68-preview</WindowsSdkPackageVersion>
+    <RootNamespace>ItsycalForWindows.Tests</RootNamespace>
+    <AssemblyName>ItsycalForWindows.Tests</AssemblyName>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <Platforms>x64</Platforms>
+    <WindowsPackageType>None</WindowsPackageType>
+    <EnableMsixTooling>false</EnableMsixTooling>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The extension only builds for a concrete platform (MSIX packaging), so pin the
+         referenced build to x64 instead of inheriting AnyCPU from this test project. -->
+    <ProjectReference Include="..\..\src\ItsycalForWindows\ItsycalForWindows.csproj">
+      <SetPlatform>Platform=x64</SetPlatform>
+    </ProjectReference>
+  </ItemGroup>
+</Project>
