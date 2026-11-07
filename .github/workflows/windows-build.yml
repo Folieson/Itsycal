@@ -55,6 +55,8 @@ jobs:
         run: >
           dotnet build windows/ItsycalForWindows.sln -c Debug -p:Platform=x64 --no-restore
           -p:GenerateAppxPackageOnBuild=true
+          -p:RuntimeIdentifier=win-x64
+          -p:SelfContained=true
           -p:AppxPackageSigningEnabled=false
           -p:AppxPackageDir="${{ github.workspace }}\windows\artifacts\msix\"
 

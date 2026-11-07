@@ -290,6 +290,8 @@ try {
             '--nologo',
             "-p:Platform=$platform",
             '-p:GenerateAppxPackageOnBuild=true',
+            "-p:RuntimeIdentifier=win-$architecture",
+            '-p:SelfContained=true',
             '-p:AppxPackageSigningEnabled=false',
             '-p:AppxBundle=Never',
             $appxPackageDirArgument
