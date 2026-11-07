@@ -35,24 +35,28 @@ required.
 
 ## Install
 
-A public release requires an MSIX signed with a certificate Windows trusts. Until the
-project's signing certificate is in place, the supported path is a development build:
+The current public build is the **1.0.0 development pre-release** — a signed MSIX for x64
+and ARM64 that is self-contained (it carries its own .NET runtime, no separate installation
+needed):
 
-1. Download the `itsycal-for-windows-dev` artifact from a successful
-   [windows-build run](https://github.com/Folieson/Itsycal/actions/workflows/windows-build.yml).
-2. From an **elevated** PowerShell, trust the development certificate and register the
+1. Download `ItsycalForWindows_1.0.0.0_x64.msix` (or the `_arm64.msix` file) and
+   `ItsycalForWindows_1.0.0.0_dev.cer` from the
+   [v1.0.0 release](https://github.com/Folieson/Itsycal/releases/tag/v1.0.0).
+2. From an **elevated** PowerShell, trust the development certificate once and register the
    package:
 
    ```powershell
-   Import-Certificate -FilePath .\devcert.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
-   Add-AppxPackage -Path .\ItsycalForWindows_1.0.0.0_x64_Debug.msix
+   Import-Certificate -FilePath .\ItsycalForWindows_1.0.0.0_dev.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+   Add-AppxPackage -Path .\ItsycalForWindows_1.0.0.0_x64.msix
    ```
 
 3. Open **Command Palette → Dock settings** and enable the **Itsycal for Windows** band.
 
-After the signing certificate exists, `winget install Folieson.ItsycalForWindows` becomes the
-primary path; the staged WinGet manifests live in [`winget/`](winget) and
-[`docs/SIGNING.md`](docs/SIGNING.md) explains the free options for open-source signing.
+The build is a pre-release because it is signed with a development certificate. `winget
+install Folieson.ItsycalForWindows` becomes the primary path once a trusted (free
+open-source) code-signing certificate is in place; the staged WinGet manifests in
+[`winget/`](winget) already carry the release URLs and hashes, and
+[`docs/SIGNING.md`](docs/SIGNING.md) documents the signing options.
 
 ## Screenshots
 

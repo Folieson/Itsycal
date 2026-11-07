@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -74,7 +74,7 @@ internal sealed partial class SettingsManager : JsonSettingsManager
         {
             LoadSettings();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
         }
 
@@ -84,7 +84,7 @@ internal sealed partial class SettingsManager : JsonSettingsManager
             {
                 SaveSettings();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
             }
         };
@@ -158,7 +158,7 @@ internal sealed partial class SettingsManager : JsonSettingsManager
                 Directory.CreateDirectory(candidate);
                 return Path.Combine(candidate, "settings.json");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
             }
         }
@@ -172,7 +172,7 @@ internal sealed partial class SettingsManager : JsonSettingsManager
         {
             return Utilities.BaseSettingsPath("ItsycalForWindows");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return null;
         }
