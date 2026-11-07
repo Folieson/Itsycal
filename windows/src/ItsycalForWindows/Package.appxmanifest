@@ -11,9 +11,10 @@
   <Identity
     Name="ItsycalForWindows"
     Publisher="CN=ItsycalForWindows-Dev"
-    Version="0.1.0.0" />
-  <!-- Local development identity. Replace Publisher with your own signing identity before
-       publishing to the Microsoft Store or WinGet. -->
+    Version="1.0.0.0" />
+  <!-- Development identity for the MSIX build. The WinGet release is unpackaged and is
+       registered by installer/setup.iss; change the Publisher only with a matching
+       signing certificate. -->
 
   <Properties>
     <DisplayName>Itsycal for Windows</DisplayName>
