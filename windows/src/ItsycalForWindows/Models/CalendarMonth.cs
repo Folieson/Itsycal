@@ -5,9 +5,9 @@ using System.Globalization;
 namespace ItsycalForWindows.Models;
 
 /// <summary>
-/// A displayed month: the month identity, its 42-cell grid, and the visible date range.
-/// Pure data and arithmetic — no UI and no I/O; the clock is read only in
-/// <see cref="ForToday"/>.
+/// A displayed month: the month identity, its 42-cell grid, the six grid rows with their
+/// ISO-8601 week numbers, and the visible date range. Pure data and arithmetic — no UI and
+/// no I/O; the clock is read only in <see cref="ForToday"/>.
 /// </summary>
 public sealed class CalendarMonth
 {
@@ -16,6 +16,7 @@ public sealed class CalendarMonth
 
     private readonly DayOfWeek _weekStart;
     private readonly IReadOnlyList<CalendarDay> _days;
+    private readonly IReadOnlyList<WeekRow> _weeks;
 
     public CalendarMonth(int year, int month, DayOfWeek weekStart = DayOfWeek.Sunday)
         : this(year, month, weekStart, daysOverride: null)
@@ -43,6 +44,7 @@ public sealed class CalendarMonth
         if (daysOverride is not null)
         {
             _days = daysOverride;
+            _weeks = BuildWeeks(_days, weekStart);
             return;
         }
 
@@ -58,6 +60,7 @@ public sealed class CalendarMonth
         }
 
         _days = days;
+        _weeks = BuildWeeks(_days, weekStart);
     }
 
     public int Year { get; }
@@ -78,6 +81,13 @@ public sealed class CalendarMonth
 
     /// <summary>Exactly 42 grid cells in reading order.</summary>
     public IReadOnlyList<CalendarDay> Days => _days;
+
+    /// <summary>
+    /// The six grid rows in reading order, each with its ISO-8601 week number. The row
+    /// boundaries honour <see cref="WeekStart"/>; the week number is read from the row's
+    /// Monday cell so it is correct for both Monday-start and Sunday-start grids.
+    /// </summary>
+    public IReadOnlyList<WeekRow> Weeks => _weeks;
 
     public DayOfWeek WeekStart => _weekStart;
 
@@ -112,5 +122,29 @@ public sealed class CalendarMonth
         }
 
         return new CalendarMonth(Year, Month, _weekStart, days);
+    }
+
+    private static IReadOnlyList<WeekRow> BuildWeeks(IReadOnlyList<CalendarDay> days, DayOfWeek weekStart)
+    {
+        // ISO-8601 weeks start on Monday and are identified by the week containing the
+        // first Thursday. Taking the number from the row's Monday cell keeps it correct
+        // for Sunday-start grids too: the Monday and Thursday of one row are always in
+        // the same ISO week.
+        var mondayColumn = ((int)DayOfWeek.Monday - (int)weekStart + WeekRow.DayCount) % WeekRow.DayCount;
+        var rowCount = days.Count / WeekRow.DayCount;
+        var weeks = new List<WeekRow>(rowCount);
+        for (var row = 0; row < rowCount; row++)
+        {
+            var cells = new CalendarDay[WeekRow.DayCount];
+            for (var column = 0; column < WeekRow.DayCount; column++)
+            {
+                cells[column] = days[(row * WeekRow.DayCount) + column];
+            }
+
+            var monday = cells[mondayColumn].Date.ToDateTime(TimeOnly.MinValue);
+            weeks.Add(new WeekRow(ISOWeek.GetWeekOfYear(monday), cells));
+        }
+
+        return weeks;
     }
 }

@@ -19,9 +19,31 @@ public sealed record CalendarEvent(
     bool IsAllDay = false,
     string? Location = null)
 {
+    /// <summary>First local calendar day the event covers.</summary>
+    public DateOnly StartDate => DateOnly.FromDateTime(Start.LocalDateTime);
+
+    /// <summary>
+    /// Last local calendar day the event covers, inclusive. An end at exactly midnight is
+    /// exclusive, which is how the appointment store reports all-day events and events
+    /// that stop at the end of the day; a zero-length or inverted span counts as one day.
+    /// </summary>
+    public DateOnly EndDateInclusive
+    {
+        get
+        {
+            var startDate = StartDate;
+            var lastDay = DateOnly.FromDateTime(End.LocalDateTime);
+            if (End.LocalDateTime.TimeOfDay == TimeSpan.Zero && lastDay > startDate)
+            {
+                lastDay = lastDay.AddDays(-1);
+            }
+
+            return lastDay < startDate ? startDate : lastDay;
+        }
+    }
+
     /// <summary>True when the event spans more than one calendar day.</summary>
-    public bool IsMultiDay =>
-        DateOnly.FromDateTime(Start.LocalDateTime) != DateOnly.FromDateTime(End.LocalDateTime);
+    public bool IsMultiDay => EndDateInclusive > StartDate;
 
     /// <summary>Short display text used by lists and cards.</summary>
     public string DisplayTitle => string.IsNullOrWhiteSpace(Subject) ? "(no title)" : Subject;
