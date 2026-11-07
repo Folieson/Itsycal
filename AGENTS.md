@@ -11,8 +11,11 @@ sources, which are kept intact.
 - `windows/src/ItsycalForWindows/` — extension source (`Program.cs`, provider, `Models/`,
   `Pages/`, `Services/`, package assets).
 - `windows/tests/` — unit tests for the pure logic (calendar grid, event ranges).
-- `installer/` — Inno Setup script used for the WinGet release.
-- `docs/` — architecture decision records and screenshots.
+- `windows/scripts/` — development tooling, including `Build-Release.ps1` (signed MSIX
+  release assets).
+- `winget/` — WinGet manifests for the MSIX release (`InstallerType: msix`).
+- `docs/` — architecture decision records and the signing/distribution guide
+  (`docs/SIGNING.md`).
 - Everything else at the repository root is upstream ItsyCal (Objective-C, macOS).
 
 ## Hard rules
@@ -21,10 +24,10 @@ sources, which are kept intact.
   fork mergeable with upstream.
 - The extension is an out-of-process COM server. Keep `Program.cs`'s
   `-RegisterProcessAsComServer` branch intact; the CLSID must stay identical in
-  `ItsycalForWindows.cs`, `Package.appxmanifest` (`com:Class Id`, `CreateInstance ClassId`)
-  and `installer/setup.iss`.
-- Never commit `bin/`, `obj/`, generated packages, certificates, `*.msix`, or `publish/`
-  output.
+  `ItsycalForWindows.cs` and `Package.appxmanifest` (`com:Class Id`, `CreateInstance
+  ClassId`).
+- Never commit `bin/`, `obj/`, generated packages, certificates, `*.msix`, or
+  `windows/artifacts/` output.
 - Do not add telemetry or network calls. Calendar data never leaves the machine; do not log
   event titles.
 - Ask before changing the MSIX identity (`Name`, `Publisher`, version) or the WinGet
@@ -39,10 +42,13 @@ dotnet build windows/ItsycalForWindows.sln -c Debug -p:Platform=x64
 dotnet test windows/tests/ItsycalForWindows.Tests.csproj -c Debug
 ```
 
-- The default build is the MSIX development package; the WinGet release builds unpackaged
-  (`-p:WindowsPackageType=None`) and wraps the output with Inno Setup — see
-  `windows/README.md`.
-- The release pipeline is `.github/workflows/release.yml`; CI builds and tests every PR.
+- The default build is the MSIX development package. Public releases are signed MSIX
+  packages built per architecture by `windows/scripts/Build-Release.ps1`; Command Palette
+  discovers extensions only through the MSIX app-extension catalog, so there is no
+  unpackaged build — see `windows/README.md` and `docs/SIGNING.md`.
+- The release pipeline is `.github/workflows/release.yml` (tag `v*`); CI builds and tests
+  every PR. A WinGet submission requires a trusted code-signing certificate; the staged
+  manifests live in `winget/`.
 
 ## Commits and PRs
 

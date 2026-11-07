@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
+#
+# WinGet installer manifest for Itsycal for Windows.
+#
+# InstallerType msix + SignatureSha256 only work when the package is signed by a
+# certificate Windows trusts; `winget install` refuses a self-signed MSIX. Never
+# submit this manifest for a development (self-signed) build. See docs/SIGNING.md.
+#
+# PackageFamilyName comes from the package identity: Identity Name + a hash of the
+# Publisher. The value below is the observed family name of the current
+# development identity (Publisher CN=ItsycalForWindows-Dev). A trusted release
+# certificate with a different subject changes the Publisher and therefore the
+# family name: re-read it from the installed signed package
+#   Get-AppxPackage ItsycalForWindows | Select-Object PackageFamilyName
+# and update this file in the same PR that changes the Publisher.
+#
+# Placeholders: the x64 and arm64 InstallerSha256/SignatureSha256 values are filled
+# in by .github/workflows/release.yml from build-info.json; the attached
+# ItsycalForWindows_<version>_winget-manifests.zip contains the replaced values.
+# SignatureSha256 is the SHA256 of the AppxSignature.p7x entry inside the signed
+# MSIX (not of the MSIX file itself).
+PackageIdentifier: Folieson.ItsycalForWindows
+PackageVersion: 1.0.0
+Platform: Windows.Desktop
+MinimumOSVersion: 10.0.19041.0
+InstallerType: msix
+Scope: user
+PackageFamilyName: ItsycalForWindows_3h7m37e1px1x6
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/Folieson/Itsycal/releases/download/v1.0.0/ItsycalForWindows_1.0.0.0_x64.msix
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+    SignatureSha256: 0000000000000000000000000000000000000000000000000000000000000000
+  - Architecture: arm64
+    InstallerUrl: https://github.com/Folieson/Itsycal/releases/download/v1.0.0/ItsycalForWindows_1.0.0.0_arm64.msix
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+    SignatureSha256: 0000000000000000000000000000000000000000000000000000000000000000
+ManifestType: installer
+ManifestVersion: 1.10.0

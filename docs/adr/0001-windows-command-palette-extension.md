@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-11-07
+- Revision: 2026-11-07 — distribution corrected to signed MSIX after the discovery and
+  WinGet research summarized in [Distribution evidence](#distribution-evidence)
 - Deciders: project maintainer
 
 ## Context
@@ -28,12 +30,36 @@ flyouts.
    (`Windows.ApplicationModel.Appointments`, restricted capability `appointmentsSystem`).
    No network, no telemetry; any access failure degrades to a calendar without events.
 5. Distribution:
-   - **WinGet / public releases:** unpackaged publish (`WindowsPackageType=None`) wrapped
-     in an Inno Setup installer, registered as a per-user COM server in `HKCU`; no
-     code-signing certificate is required for `winget install`.
-   - **Development:** MSIX package for local install via `windows/scripts/deploy-local.ps1`.
+   - **Public releases and WinGet:** a signed, self-contained MSIX per architecture
+     (`windows/scripts/Build-Release.ps1`), published as GitHub Release assets, plus a
+     WinGet manifest with `InstallerType: msix`, `PackageFamilyName` and
+     `SignatureSha256`. The package must be signed by a trusted certificate; see
+     `docs/SIGNING.md`.
+   - **Development:** MSIX package for local install via `windows/scripts/deploy-local.ps1`,
+     signed with an ephemeral self-signed certificate.
 6. The extension ships no autonomous updater; WinGet/`winget upgrade` owns updates, and the
-   repository tags releases (`v*`) whose workflow builds the installers and attaches them.
+   repository tags releases (`v*`) whose workflow builds, signs, and attaches the packages
+   together with the prepared WinGet manifests.
+
+## Distribution evidence
+
+The MSIX-only route is not a preference; it is the only route that works:
+
+- Command Palette discovers extensions only through the MSIX app-extension catalog
+  (`AppExtensionCatalog.Open("com.microsoft.commandpalette")`). The official extension
+  template's unpackaged/Inno Setup guidance is therefore non-functional — the CmdPal lead
+  has no working example of an unpackaged extension, and the template's HKCU COM
+  registration is not picked up by the host
+  ([PowerToys #44442](https://github.com/microsoft/PowerToys/issues/44442)).
+- Real Command Palette extensions in the WinGet community repository ship signed MSIX with
+  `InstallerType: msix`, `PackageFamilyName`, `SignatureSha256`, and the
+  `windows-commandpalette-extension` locale tag that Command Palette uses for discovery.
+- The package is self-contained: the .NET runtime travels inside the MSIX and no
+  Windows App Runtime package dependency is required.
+- `SignatureSha256` is the SHA256 of the `AppxSignature.p7x` entry inside the MSIX, and
+  `winget install` requires that signature to be trusted. The certificate subject must
+  match the package `Publisher`; a self-signed package only installs after the user trusts
+  its `.cer` and is not acceptable for WinGet.
 
 ## Alternatives considered
 
@@ -46,14 +72,19 @@ flyouts.
 - **Writing and editing events in the first release** — requires write access and conflict
   handling; the read-only integration proves the product without becoming a calendar
   client first.
+- **Unpackaged install with an Inno Setup installer and HKCU COM registration** — the host
+  never discovers such an extension, so it cannot be supported; see [Distribution
+  evidence](#distribution-evidence).
 
 ## Consequences
 
 - Positive: one extension delivers date glanceability, a month grid, and events with no
-  extra windows; upstream stays mergeable; WinGet distribution needs no certificate.
-- Negative: Dock placement and visibility are PowerToys settings, not ours; the CmdPal
-  extension API is young; the MSIX identity and the WinGet package identifier must stay in
-  sync with the installer's COM registration.
+  extra windows; upstream stays mergeable; the signed MSIX is discoverable by Command
+  Palette and installable/upgradable through WinGet.
+- Negative: releases now depend on a trusted code-signing certificate and the MSIX
+  packaging tooling; the Publisher/identity and the package family name are
+  release-sensitive, so a certificate with a different subject forces a deliberate
+  identity change; a WinGet submission also needs publicly downloadable release assets.
 - Neutral: the macOS app and the Windows extension share branding and intent, not code.
 
 ## Follow-ups
@@ -61,7 +92,9 @@ flyouts.
 - [ ] Unit tests for the calendar grid, ISO weeks, day spans, and event ranges (in
       progress).
 - [ ] Day selection with per-day event details and "open in Calendar".
-- [ ] WinGet manifest submission (`Folieson.ItsycalForWindows`) after the first tagged
-      release.
+- [ ] Obtain a trusted code-signing certificate, cut a signed release, and submit
+      `Folieson.ItsycalForWindows` to `microsoft/winget-pkgs` using the manifests staged in
+      `winget/` (see [docs/SIGNING.md](../SIGNING.md)).
+- [ ] Verify the arm64 MSIX on Windows on ARM hardware.
 - [ ] Localization beyond English.
 - [ ] Event reminders/alerts (ItsyCal parity); needs write access, out of scope for now.

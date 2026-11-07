@@ -25,23 +25,31 @@ application is upstream and untouched; the Windows product lives in `windows/`.
 |---|---|
 | Windows | 10 2004 (build 19041) or newer |
 | PowerToys | 0.102 or newer, with Command Palette enabled |
-| Runtime | .NET 10 Desktop Runtime (installed by the installer when missing) |
+| Runtime | none separate — the .NET 10 runtime is inside the MSIX package |
 
 ## Install
+
+Itsycal for Windows is distributed as a signed MSIX package from
+[GitHub Releases](https://github.com/Folieson/Itsycal/releases/latest). Download the asset
+for your architecture and register it:
+
+```powershell
+# download ItsycalForWindows_<package-version>_x64.msix (or _arm64.msix) from the
+# latest release, then register it:
+Add-AppxPackage .\ItsycalForWindows_1.0.0.0_x64.msix
+```
+
+Once the WinGet manifest is accepted, the same release installs with:
 
 ```powershell
 winget install Folieson.ItsycalForWindows
 ```
 
-Until the WinGet manifest is accepted, install the signed installer from the
-[latest release](https://github.com/Folieson/Itsycal/releases/latest):
-
-```powershell
-# after downloading ItsycalForWindows_x.y.z_x64.exe
-.\ItsycalForWindows_x.y.z_x64.exe /VERYSILENT /SUPPRESSMSGBOXES
-```
-
 Then open **Command Palette → Dock settings** and enable the **Itsycal for Windows** band.
+
+Command Palette discovers extensions only through the MSIX app-extension catalog, so there
+is no portable/unpackaged installer. Development (self-signed) packages need their `.cer`
+trusted first; see [windows/README.md](windows/README.md).
 
 ## Build from source
 
@@ -53,8 +61,9 @@ dotnet build windows/ItsycalForWindows.sln -c Debug -p:Platform=x64
 dotnet test  windows/tests/ItsycalForWindows.Tests.csproj -c Debug
 ```
 
-Development install (MSIX, elevated shell) and unpackaged release packaging are described in
-[windows/README.md](windows/README.md).
+Development install (MSIX, elevated shell) and the signed release build are described in
+[windows/README.md](windows/README.md); signing options and the WinGet submission process
+are in [docs/SIGNING.md](docs/SIGNING.md).
 
 ## Configuration
 
@@ -76,8 +85,8 @@ capability in the package manifest.
 | `windows/` | Windows extension source, tests, build scripts. |
 | `windows/src/ItsycalForWindows/` | The Command Palette extension (C#, .NET 10). |
 | `windows/tests/` | Unit tests for the pure calendar/event logic. |
-| `installer/` | Inno Setup script used for WinGet releases. |
-| `docs/adr/` | Architecture decision records. |
+| `winget/` | WinGet manifests for the signed MSIX release. |
+| `docs/` | Architecture decision records and the signing/distribution guide. |
 | `Itsycal/`, `Itsycal.xcodeproj/`, … | Upstream macOS application (unchanged). |
 
 ## Contributing

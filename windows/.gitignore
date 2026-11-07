@@ -4,8 +4,13 @@ obj/
 publish/
 AppPackages/
 BundleArtifacts/
-artifacts/
 Generated Files/
+
+# Release output (windows/scripts/Build-Release.ps1 and .github/workflows/release.yml):
+# signed MSIX packages, SHA256SUMS.txt, build-info.json, WinGet manifest staging
+artifacts/
+
+# Signing material: certificates and private keys never belong in the repository
 *.msix
 *.msixbundle
 *.appx
