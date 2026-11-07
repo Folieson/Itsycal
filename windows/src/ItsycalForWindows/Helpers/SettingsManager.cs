@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -68,10 +68,26 @@ internal sealed partial class SettingsManager : JsonSettingsManager
         Settings.Add(_dockDateFormat);
         Settings.Add(_showEventIndicator);
 
-        // Load settings from file upon initialization.
-        LoadSettings();
+        // Load settings from file upon initialization. A missing, unreadable or corrupt
+        // settings file must never prevent the extension from starting.
+        try
+        {
+            LoadSettings();
+        }
+        catch (Exception ex)
+        {
+        }
 
-        Settings.SettingsChanged += (_, _) => SaveSettings();
+        Settings.SettingsChanged += (_, _) =>
+        {
+            try
+            {
+                SaveSettings();
+            }
+            catch (Exception ex)
+            {
+            }
+        };
     }
 
     /// <summary>True when the grid should start weeks on Monday.</summary>
@@ -122,9 +138,43 @@ internal sealed partial class SettingsManager : JsonSettingsManager
 
     internal static string SettingsJsonPath()
     {
-        var directory = Utilities.BaseSettingsPath("ItsycalForWindows");
-        Directory.CreateDirectory(directory);
+        // The host runs the extension inside a package identity whose LocalApplicationData
+        // folder may not be writable. Settings are a convenience: fall back to the temp
+        // folder (and finally the app directory) instead of failing the whole extension.
+        foreach (var candidate in new[]
+                 {
+                     TryResolveSettingsDirectory(),
+                     Path.Combine(Path.GetTempPath(), "ItsycalForWindows"),
+                     AppContext.BaseDirectory,
+                 })
+        {
+            if (string.IsNullOrEmpty(candidate))
+            {
+                continue;
+            }
 
-        return Path.Combine(directory, "settings.json");
+            try
+            {
+                Directory.CreateDirectory(candidate);
+                return Path.Combine(candidate, "settings.json");
+            }
+            catch (Exception ex)
+            {
+            }
+        }
+
+        return Path.Combine(Path.GetTempPath(), "ItsycalForWindows", "settings.json");
+    }
+
+    private static string? TryResolveSettingsDirectory()
+    {
+        try
+        {
+            return Utilities.BaseSettingsPath("ItsycalForWindows");
+        }
+        catch (Exception ex)
+        {
+            return null;
+        }
     }
 }
