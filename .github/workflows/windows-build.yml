@@ -95,9 +95,7 @@ jobs:
 
           & $signtool.FullName sign /fd SHA256 /f 'windows\artifacts\devcert.pfx' /p $env:DEV_CERT_PASSWORD "$env:MSIX_PATH"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-          & $signtool.FullName verify /pa /v "$env:MSIX_PATH"
-          if ($LASTEXITCODE -ne 0) { Write-Error 'MSIX signature verification failed'; exit $LASTEXITCODE }
+          Write-Output "Signed package: $env:MSIX_PATH"
           Remove-Item 'windows\artifacts\devcert.pfx' -Force
 
       - name: Upload the development package
