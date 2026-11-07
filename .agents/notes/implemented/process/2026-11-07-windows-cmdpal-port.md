@@ -56,12 +56,25 @@ flyouts. The machine already runs PowerToys 0.102.
 
 ## Follow-ups / deferred work
 
-- [ ] Automate local MSIX signing/install (`scripts/deploy-local.ps1`) and document it.
-- [ ] Add unit tests for the month-grid arithmetic and the event-range mapping.
+- [x] Automate local MSIX signing/install: CI uploads a signed development package, and
+      `scripts/deploy-local.ps1` trusts the certificate and registers it from an elevated
+      shell.
+- [ ] Add unit tests for the month-grid arithmetic, the event-range helpers, and day-span
+      semantics; CI currently only builds and validates the scaffold.
 - [ ] Day selection and per-day event list; keyboard navigation inside the flyout.
 - [ ] Event alerts/reminders (ItsyCal parity), which need write access and are out of scope
       for the read-only first cut.
 - [ ] Publishing path (Store or WinGet) per the CmdPal `publish-extension` skill.
+
+## Review outcome (independent reviewer, both feature PRs)
+
+Both feature PRs were approved with notes and no blocking findings. Resolved during
+integration: the dock item and calendar page are now cached in the provider (month state and
+the refresh timer survive dock re-queries), the provider's disposable resources are
+released from the extension `Dispose`, the event list is clipped to the visible range, and
+the two independent day-span implementations were reduced to one source of truth on
+`CalendarEvent.StartDate`/`EndDateInclusive`. Deferred: unit tests and live verification of
+recurrence expansion against a configured calendar.
 
 ## References
 

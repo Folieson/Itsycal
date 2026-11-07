@@ -39,18 +39,33 @@ Output lands under `windows/src/ItsycalForWindows/bin/x64/Debug/`.
 ## Install for development
 
 The extension is a packaged COM server, so a plain build is not enough — the MSIX package
-must be registered:
+must be registered with a certificate the machine trusts.
 
-1. Enable **Developer Mode** (Settings → System → For developers) or trust the package's
-   signing certificate.
-2. Build the package: `dotnet build windows/ItsycalForWindows.sln -c Debug -p:Platform=x64`
-   and locate the generated `.msix` under the project output (`AppPackages`).
-3. Install it: `Add-AppxPackage -Path <path-to.msix>`.
-4. Restart Command Palette, or run `Reload` → "Reload Command Palette extensions".
-5. Open the Dock settings and enable the **Itsycal for Windows** band.
+The supported path on a machine without the Windows SDK (the normal case when the package
+is built in CI):
 
-Automated local deployment is still being finalised (the PowerToys template normally
-deploys from Visual Studio); a CLI script will be added under `scripts/` once verified.
+1. Take the `itsycal-for-windows-dev` artifact from the latest successful
+   `windows-build` run (`gh run download <run-id> -n itsycal-for-windows-dev -D .\pkg`).
+   It contains a signed `ItsycalForWindows_*.msix` and the matching `devcert.cer`.
+2. Run the installer from an **elevated** PowerShell:
+
+   ```powershell
+   .\scripts\deploy-local.ps1 -MsixPath .\pkg\ItsycalForWindows_*.msix -CertPath .\pkg\devcert.cer
+   ```
+
+   The script trusts the development certificate in `LocalMachine\TrustedPeople`, registers
+   the package, and restarts Command Palette.
+3. Enable the **Itsycal for Windows** band in the Command Palette Dock settings.
+
+Building and packaging locally (needs the Windows SDK and .NET 10 SDK):
+
+```powershell
+dotnet build windows/ItsycalForWindows.sln -c Debug -p:Platform=x64 -p:GenerateAppxPackageOnBuild=true
+Add-AppxPackage -Path <generated .msix>   # after trusting the signing certificate
+```
+
+The development certificate is ephemeral (one per CI run), so a package from an older run
+must be re-trusted with its own `.cer`.
 
 ## Events and privacy
 

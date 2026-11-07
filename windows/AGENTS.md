@@ -47,9 +47,10 @@ window management.
 - Read events from the local Windows appointment store via `Windows.ApplicationModel.
   Appointments` (read-only). No network calls, no telemetry, no writing to the user's
   calendar.
-- The package manifest declares the `appointments` capability. If the capability or API is
-  unavailable at runtime, fall back to an empty event list — the calendar must never fail
-  because events are unavailable.
+- The package manifest declares the restricted `appointmentsSystem` capability (the
+  `appointments` capability only covers provider dialogs, not the read API). If the
+  capability or API is unavailable at runtime, fall back to an empty event list — the
+  calendar must never fail because events are unavailable.
 - Events are cached per visible month range; refresh when the month changes or the flyout
   opens, not on every render tick.
 - Distinguish all-day events and multi-day spans explicitly in the model.

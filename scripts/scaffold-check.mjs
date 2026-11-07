@@ -345,8 +345,8 @@ function checkCmdPalProject(root) {
   if (/CN=Microsoft Corporation/.test(manifest)) {
     fail(manifestRel, 'Publisher still uses the template identity; set the development or release identity');
   }
-  if (!/Name="appointments"/.test(manifest)) {
-    warn(manifestRel, 'the appointments capability is not declared; events will be unavailable in the packaged app');
+  if (!/Name="appointmentsSystem"/.test(manifest)) {
+    warn(manifestRel, 'the appointmentsSystem capability is not declared; events will be unavailable in the packaged app');
   }
 
   const guid = /\[Guid\("([^"]+)"\)\]/.exec(extension)?.[1]?.toUpperCase();

@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation
+// Copyright (c) Microsoft Corporation
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -30,5 +30,9 @@ public sealed partial class ItsycalForWindows : IExtension, IDisposable
         };
     }
 
-    public void Dispose() => this._extensionDisposedEvent.Set();
+    public void Dispose()
+    {
+        _provider.DisposeResources();
+        _extensionDisposedEvent.Set();
+    }
 }

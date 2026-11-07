@@ -15,13 +15,13 @@ internal sealed partial class SettingsManager : JsonSettingsManager
     private static readonly string _namespace = "ItsycalForWindows";
 
     private readonly ToggleSetting _weekStartsOnMonday = new(
-        Namespaced("WeekStartsOnMonday"),
+        Namespaced(nameof(WeekStartsOnMonday)),
         "Week starts on Monday",
         "Use Monday as the first day of the week in the calendar grid.",
         CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek == DayOfWeek.Monday);
 
     private readonly ToggleSetting _showWeekNumbers = new(
-        Namespaced("ShowWeekNumbers"),
+        Namespaced(nameof(ShowWeekNumbers)),
         "Show ISO week numbers",
         "Show a week-number column in the month grid.",
         false);
@@ -39,8 +39,11 @@ internal sealed partial class SettingsManager : JsonSettingsManager
         Settings.SettingsChanged += (_, _) => SaveSettings();
     }
 
+    /// <summary>True when the grid should start weeks on Monday.</summary>
+    public bool WeekStartsOnMonday => _weekStartsOnMonday.Value;
+
     /// <summary>First day of the week used by the calendar grid.</summary>
-    public DayOfWeek WeekStart => _weekStartsOnMonday.Value ? DayOfWeek.Monday : DayOfWeek.Sunday;
+    public DayOfWeek WeekStart => WeekStartsOnMonday ? DayOfWeek.Monday : DayOfWeek.Sunday;
 
     /// <summary>True when the grid should show ISO week numbers.</summary>
     public bool ShowWeekNumbers => _showWeekNumbers.Value;
