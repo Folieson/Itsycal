@@ -8,10 +8,13 @@ with read-only events from the Windows appointment store.
 
 | Tool | Purpose |
 |---|---|
-| .NET 10 SDK (10.0.x) | build, tests, publish |
-| Windows SDK 10.0.26100 | CsWinRT projection and MSIX packaging |
+| .NET 10 SDK (10.0.x) | build, tests, packaging |
+| Windows SDK 10.0.26100 | CsWinRT projection, MSIX packaging, `signtool` |
 | PowerToys 0.102+ | Command Palette host |
-| Inno Setup 6 (release only) | WinGet installer packaging |
+
+A code-signing certificate is only needed to produce a trusted release package; development
+packages use an ephemeral self-signed certificate. See `docs/SIGNING.md` at the repository
+root.
 
 ## Build and test
 
@@ -22,16 +25,42 @@ dotnet test  windows/tests/ItsycalForWindows.Tests.csproj -c Debug
 ```
 
 The default configuration builds the **MSIX development package** (useful for local
-installation and debugging). The WinGet release builds **unpackaged**:
+installation and debugging).
+
+## Release packages (signed MSIX)
+
+Public releases are signed, self-contained MSIX packages — the only form Command Palette
+discovers. Build them with the release script from the repository root:
 
 ```powershell
-dotnet publish windows/src/ItsycalForWindows/ItsycalForWindows.csproj `
-  -c Release -r win-x64 --self-contained false `
-  -p:WindowsPackageType=None -p:EnableMsixTooling=false -o publish/x64
+# self-signed development packages (local testing only; users must trust the .cer)
+.\windows\scripts\Build-Release.ps1 -Version 1.0.0 -SelfSigned
+
+# trusted release build (the only kind acceptable for WinGet)
+.\windows\scripts\Build-Release.ps1 -Version 1.0.0 `
+  -CertificatePath .\itsycal-signing.pfx -CertificatePassword $env:SIGNING_PFX_PASSWORD
 ```
 
-`installer/setup.iss` wraps that output into `ItsycalForWindows_<version>_<arch>.exe` and
-registers the COM server under `HKCU`, which is what the WinGet manifest points at.
+The script builds each architecture (`x64`, `arm64` by default) with
+`GenerateAppxPackageOnBuild=true` and `AppxPackageSigningEnabled=false`, signs the package
+with `signtool`, verifies trusted signatures, and writes everything to
+`windows/artifacts/release/<version>/`:
+
+- `ItsycalForWindows_<package-version>_<arch>.msix` — the signed package,
+- `ItsycalForWindows_<package-version>_dev.cer` — public development certificate
+  (self-signed builds only),
+- `SHA256SUMS.txt` — hashes of every asset,
+- `build-info.json` — package identity and per-architecture `sha256`/`signatureSha256`
+  values used to fill in the WinGet manifest.
+
+`-Version` must match the `Identity Version` in `Package.appxmanifest` (`1.0.0` maps to
+`1.0.0.0`); the MSIX identity is release-sensitive, so bump the manifest deliberately.
+Certificate options, required GitHub secrets, and the WinGet submission steps are in
+[docs/SIGNING.md](../docs/SIGNING.md).
+
+The release pipeline (`.github/workflows/release.yml`) runs this script on a `v*` tag. With
+`SIGNING_PFX_BASE64`/`SIGNING_PFX_PASSWORD` set it publishes a signed release; without
+them it publishes a self-signed development prerelease and skips the WinGet submission.
 
 ## Install a development build (MSIX)
 
@@ -59,7 +88,7 @@ you install a package from a different run.
 | `src/ItsycalForWindows/Pages/` | Dock item and Adaptive Card calendar flyout. |
 | `src/ItsycalForWindows/Services/` | Appointment-store access and event range helpers. |
 | `tests/` | Unit tests for the pure logic. |
-| `scripts/` | Development tooling (MSIX install script, icon generation). |
+| `scripts/` | Development tooling: MSIX install script, release build/sign script, icon generation. |
 | `Package.appxmanifest` | MSIX identity, COM server, CmdPal app extension, `appointmentsSystem` capability. |
 
 ## Events and privacy
@@ -73,8 +102,15 @@ packaged run simply shows no events; the calendar still works.
 
 - **Band not visible** — enable it in Command Palette → Dock settings; the host persists the
   selection per user.
-- **Extension not listed** — restart Command Palette (or `Reload` → “Reload Command Palette
-  extensions”); for unpackaged installs check `HKCU\Software\Classes\CLSID\{D13947EE-B1EE-461A-8160-EDCAAA65A3AA}`.
+- **Extension not listed** — restart Command Palette (or `Reload` → "Reload Command Palette
+  extensions"). If it is still missing, confirm the MSIX is installed
+  (`Get-AppxPackage ItsycalForWindows`) and check the package's app-extension registration in
+  `Package.appxmanifest`.
+- **Install fails with a trust or signature error** — the package was signed with a
+  certificate this machine does not trust. Trust the matching `.cer`
+  (`Import-Certificate -FilePath <dev>.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople`
+  from an elevated shell), or install a release signed with a trusted certificate.
 - **No events** — the appointment store is empty, no calendar account is configured, or the
-  app is running unpackaged without the `appointmentsSystem` capability (the last case is
-  expected for a plain `dotnet run`).
+  extension is running outside its package identity (for example a plain `dotnet run`), in
+  which case the `appointmentsSystem` capability is not granted and the calendar shows
+  without events.

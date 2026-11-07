@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.10.0.schema.json
+#
+# WinGet version manifest for Itsycal for Windows.
+#
+# This package is MSIX-only: Command Palette discovers extensions through the MSIX
+# app-extension catalog (AppExtensionCatalog.Open("com.microsoft.commandpalette")),
+# so an unpackaged or Inno Setup install is not discoverable. See
+# docs/adr/0001-windows-command-palette-extension.md and docs/SIGNING.md.
+#
+# The directory name (winget/Folieson.ItsycalForWindows/1.0.0) must match
+# PackageIdentifier and PackageVersion. PackageVersion is the marketing version;
+# the MSIX Identity Version is 1.0.0.0 and the release asset tag is v1.0.0.
+# If the winget-pkgs validation pipeline rejects ManifestVersion 1.10.0, lower it
+# in all three manifests to the schema version it currently accepts.
+PackageIdentifier: Folieson.ItsycalForWindows
+PackageVersion: 1.0.0
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.10.0

@@ -1,0 +1,322 @@
+name: release
+
+# Builds signed MSIX packages for x64 and arm64 from a v* tag, publishes a GitHub
+# release, and prepares the WinGet manifests for submission.
+#
+# A WinGet submission requires a trusted code-signing certificate: `winget
+# install` only accepts MSIX packages whose signature chains to a trusted root,
+# and the manifest's SignatureSha256 is the hash of that signature. Without the
+# signing secrets the workflow still produces a release, but marks it as a
+# development build (prerelease, self-signed certificate attached) and refuses to
+# prepare a WinGet submission.
+#
+# Required secrets for a signed release:
+#   SIGNING_PFX_BASE64    base64 of the .pfx with a trusted code-signing certificate
+#   SIGNING_PFX_PASSWORD  password of that .pfx
+# Optional secret:
+#   WINGET_PAT            GitHub token that may fork microsoft/winget-pkgs and open
+#                         the WingetCreate submission pull request
+#
+# See docs/SIGNING.md for certificate options and the rotation procedure.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Resolve the release version and signing mode
+        id: release_info
+        shell: pwsh
+        env:
+          SIGNING_PFX_BASE64: ${{ secrets.SIGNING_PFX_BASE64 }}
+          WINGET_PAT: ${{ secrets.WINGET_PAT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:RELEASE_TAG
+          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+            throw "Release tags must look like v1.0.0 (got '$tag')."
+          }
+          $version = $Matches['version']
+
+          [xml]$manifest = Get-Content -LiteralPath 'windows/src/ItsycalForWindows/Package.appxmanifest' -Raw
+          $packageVersion = [string]$manifest.Package.Identity.Version
+          if ($packageVersion -ne "$version.0") {
+            throw "Tag $tag does not match Package.appxmanifest Identity Version $packageVersion. Bump the manifest version deliberately in the release commit; the MSIX identity is release-sensitive."
+          }
+
+          $buildKind = if ([string]::IsNullOrWhiteSpace($env:SIGNING_PFX_BASE64)) { 'dev' } else { 'trusted' }
+          $wingetEnabled = if ([string]::IsNullOrWhiteSpace($env:WINGET_PAT)) { 'false' } else { 'true' }
+          "VERSION=$version" >> $env:GITHUB_ENV
+          "PACKAGE_VERSION=$packageVersion" >> $env:GITHUB_ENV
+          "BUILD_KIND=$buildKind" >> $env:GITHUB_ENV
+          "build_kind=$buildKind" >> $env:GITHUB_OUTPUT
+          "winget_enabled=$wingetEnabled" >> $env:GITHUB_OUTPUT
+          Write-Host "Release ${tag}: version $version, package version $packageVersion, signing mode $buildKind, winget automation $wingetEnabled."
+
+      - name: Build and sign the MSIX packages
+        shell: pwsh
+        env:
+          SIGNING_PFX_BASE64: ${{ secrets.SIGNING_PFX_BASE64 }}
+          SIGNING_PFX_PASSWORD: ${{ secrets.SIGNING_PFX_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pfxPath = $null
+          $arguments = @{ Version = $env:VERSION; Architectures = @('x64', 'arm64') }
+          if ($env:BUILD_KIND -eq 'trusted') {
+            $pfxPath = Join-Path $env:RUNNER_TEMP 'itsycal-release.pfx'
+            [System.IO.File]::WriteAllBytes($pfxPath, [System.Convert]::FromBase64String($env:SIGNING_PFX_BASE64))
+            $arguments.CertificatePath = $pfxPath
+            $arguments.CertificatePassword = $env:SIGNING_PFX_PASSWORD
+          }
+          else {
+            Write-Host 'No SIGNING_PFX_BASE64 secret: building a self-signed development release.'
+            $arguments.SelfSigned = $true
+          }
+          try {
+            & ./windows/scripts/Build-Release.ps1 @arguments
+            if ($LASTEXITCODE -ne 0) {
+              throw "Build-Release.ps1 failed (exit code $LASTEXITCODE)."
+            }
+          }
+          finally {
+            if ($pfxPath -and (Test-Path -LiteralPath $pfxPath)) {
+              Remove-Item -LiteralPath $pfxPath -Force
+            }
+          }
+
+      - name: Prepare the WinGet manifests
+        shell: pwsh
+        env:
+          SOURCE_REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:RELEASE_TAG
+          $version = $env:VERSION
+          $packageVersion = $env:PACKAGE_VERSION
+          $sourceDir = "winget/Folieson.ItsycalForWindows/$version"
+          if (-not (Test-Path -LiteralPath $sourceDir)) {
+            throw "No WinGet manifests for $version. Create winget/Folieson.ItsycalForWindows/$version/ before tagging the release."
+          }
+
+          $buildInfo = Get-Content -LiteralPath "windows/artifacts/release/$version/build-info.json" -Raw | ConvertFrom-Json
+          $manifestDir = "windows/artifacts/winget/$version"
+          Remove-Item -LiteralPath $manifestDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
+          Copy-Item -Path (Join-Path $sourceDir '*.yaml') -Destination $manifestDir
+
+          $installerPath = Join-Path $manifestDir 'Folieson.ItsycalForWindows.installer.yaml'
+          if (-not (Test-Path -LiteralPath $installerPath)) {
+            throw "Missing Folieson.ItsycalForWindows.installer.yaml in $sourceDir."
+          }
+          $architecture = $null
+          $patched = foreach ($line in (Get-Content -LiteralPath $installerPath)) {
+            if ($line -match '^\s*-?\s*Architecture:\s*(\w+)\s*$') {
+              $architecture = $Matches[1].ToLowerInvariant()
+            }
+            $artifact = $buildInfo.artifacts | Where-Object { $_.architecture -eq $architecture } | Select-Object -First 1
+            if ($line -match '^\s*InstallerUrl:') {
+              if (-not $artifact) { throw "No build artifact for architecture '$architecture'." }
+              $line = $line -replace 'InstallerUrl:.*', "InstallerUrl: https://github.com/$($env:SOURCE_REPOSITORY)/releases/download/$tag/$($artifact.file)"
+            }
+            elseif ($line -match '^\s*InstallerSha256:') {
+              if (-not $artifact) { throw "No build artifact for architecture '$architecture'." }
+              $line = $line -replace 'InstallerSha256:.*', "InstallerSha256: $($artifact.sha256.ToUpperInvariant())"
+            }
+            elseif ($line -match '^\s*SignatureSha256:') {
+              if (-not $artifact) { throw "No build artifact for architecture '$architecture'." }
+              $line = $line -replace 'SignatureSha256:.*', "SignatureSha256: $($artifact.signatureSha256.ToUpperInvariant())"
+            }
+            $line
+          }
+          Set-Content -LiteralPath $installerPath -Value @($patched) -Encoding utf8
+
+          foreach ($file in (Get-ChildItem -LiteralPath $manifestDir -Filter '*.yaml')) {
+            $content = Get-Content -LiteralPath $file.FullName -Raw
+            if ($content -match '0{64}') {
+              throw "The placeholder SHA256 in $($file.Name) was not replaced."
+            }
+            if ($content -notmatch 'ManifestVersion:\s*\d+\.\d+\.\d+') {
+              throw "$($file.Name) does not declare a ManifestVersion."
+            }
+            if ($file.Name -like '*.installer.yaml') {
+              $hashes = [regex]::Matches($content, '(?m)^\s*(Installer|Signature)Sha256:\s*[A-Fa-f0-9]{64}\s*$')
+              if ($hashes.Count -ne 4) {
+                throw "$($file.Name) must contain four SHA256 values (InstallerSha256 and SignatureSha256 for x64 and arm64)."
+              }
+            }
+          }
+          $installerContent = Get-Content -LiteralPath $installerPath -Raw
+          if ($installerContent -notmatch '(?m)^InstallerType:\s*msix\s*$') {
+            throw 'The installer manifest must declare InstallerType: msix.'
+          }
+          if ($installerContent -notmatch '(?m)^PackageFamilyName:\s*\S+\s*$') {
+            throw 'The installer manifest must declare the MSIX PackageFamilyName.'
+          }
+
+          $zipName = "ItsycalForWindows_${packageVersion}_winget-manifests.zip"
+          $zipPath = "windows/artifacts/release/$version/$zipName"
+          Compress-Archive -Path (Join-Path $manifestDir '*') -DestinationPath $zipPath -Force
+          Write-Host "Prepared the WinGet manifests for $version in $manifestDir."
+
+      - name: Finalize the release assets and notes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:RELEASE_TAG
+          $version = $env:VERSION
+          $packageVersion = $env:PACKAGE_VERSION
+          $releaseDir = "windows/artifacts/release/$version"
+          $repository = $env:GITHUB_REPOSITORY
+          $baseUrl = "https://github.com/$repository/releases/download/$tag"
+
+          $checksumFiles = @(Get-ChildItem -LiteralPath $releaseDir -File |
+              Where-Object { $_.Name -notin @('SHA256SUMS.txt', 'build-info.json') } |
+              Sort-Object Name)
+          $checksumLines = @($checksumFiles | ForEach-Object {
+                  '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+              })
+          Set-Content -LiteralPath (Join-Path $releaseDir 'SHA256SUMS.txt') -Value $checksumLines -Encoding ascii
+
+          $msixNames = @($checksumFiles | Where-Object { $_.Extension -eq '.msix' } | ForEach-Object { $_.Name })
+          $cerName = @($checksumFiles | Where-Object { $_.Extension -eq '.cer' } | ForEach-Object { $_.Name }) | Select-Object -First 1
+          $wingetZip = @($checksumFiles | Where-Object { $_.Name -like '*winget-manifests.zip' } | ForEach-Object { $_.Name }) | Select-Object -First 1
+
+          $lines = @(
+              "## Itsycal for Windows $version",
+              '',
+              'PowerToys Command Palette extension: an always-visible Dock band with the date and a month calendar with read-only events from the Windows appointment store.',
+              '',
+              '### Install',
+              ''
+          )
+          if ($env:BUILD_KIND -eq 'trusted') {
+            $lines += @(
+                "Signed MSIX for $packageVersion. Download the package for your architecture and register it:",
+                '',
+                '```powershell',
+                "Invoke-WebRequest $baseUrl/$($msixNames | Where-Object { $_ -like '*_x64.msix' } | Select-Object -First 1) -OutFile ItsycalForWindows_x64.msix",
+                'Add-AppxPackage .\ItsycalForWindows_x64.msix',
+                '```',
+                '',
+                'Use the `arm64` asset on Windows on ARM. Once the WinGet manifest is accepted, `winget install Folieson.ItsycalForWindows` installs this release.'
+            )
+          }
+          else {
+            $lines += @(
+                '> **Development build.** The packages are signed with an ephemeral self-signed certificate and are not suitable for WinGet. Trust the certificate before installing:',
+                '',
+                '```powershell',
+                "# elevated shell, once per release",
+                "Import-Certificate -FilePath .\$cerName -CertStoreLocation Cert:\LocalMachine\TrustedPeople",
+                "Add-AppxPackage .\ItsycalForWindows_${packageVersion}_x64.msix",
+                '```',
+                '',
+                'A self-signed MSIX cannot be installed via `winget install`; cut a release with `SIGNING_PFX_BASE64`/`SIGNING_PFX_PASSWORD` set to publish a trusted build.'
+            )
+          }
+          $lines += @(
+              '',
+              '### Assets',
+              ''
+          )
+          foreach ($name in $msixNames) {
+            $lines += "- ``$name`` - MSIX package"
+          }
+          if ($wingetZip) {
+            $lines += "- ``$wingetZip`` - WinGet manifests prepared for this release (hashes and URLs filled in)"
+          }
+          if ($cerName) {
+            $lines += "- ``$cerName`` - public development certificate (trust it before installing a development build)"
+          }
+          $lines += @(
+              "- ``SHA256SUMS.txt`` - SHA256 of every asset",
+              '',
+              '### Verify',
+              '',
+              'Compare each download with `SHA256SUMS.txt` (`Get-FileHash <file> -Algorithm SHA256`).',
+              '',
+              "Full changelog: https://github.com/$repository/commits/$tag"
+          )
+
+          $notesPath = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          Set-Content -LiteralPath $notesPath -Value $lines -Encoding utf8
+          "RELEASE_NOTES=$notesPath" >> $env:GITHUB_ENV
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $lines -Encoding utf8
+          Write-Host "Release notes written to $notesPath."
+
+      - name: Create the GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $releaseDir = "windows/artifacts/release/$($env:VERSION)"
+          $assets = @(Get-ChildItem -LiteralPath $releaseDir -File |
+              Where-Object { $_.Name -ne 'build-info.json' } |
+              Sort-Object Name |
+              Select-Object -ExpandProperty FullName)
+          if ($assets.Count -lt 3) {
+            throw "Expected at least three release assets, found $($assets.Count)."
+          }
+          $arguments = @('release', 'create', $env:RELEASE_TAG)
+          $title = "Itsycal for Windows $($env:VERSION)"
+          if ($env:BUILD_KIND -ne 'trusted') {
+            $title = "$title (development build)"
+            $arguments += '--prerelease'
+          }
+          $arguments += @('--title', $title, '--notes-file', $env:RELEASE_NOTES)
+          $arguments += $assets
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "gh release create failed (exit code $LASTEXITCODE)."
+          }
+          Write-Host "Published $($env:RELEASE_TAG) with $($assets.Count) assets."
+
+      - name: Submit a WinGet update (optional)
+        # Best effort: only runs for trusted builds with a WINGET_PAT secret. The
+        # first package submission to microsoft/winget-pkgs is manual
+        # (`wingetcreate new`); this step updates the already accepted package.
+        # The release is published before this step, so a failure here does not
+        # lose the artifacts.
+        if: ${{ steps.release_info.outputs.build_kind == 'trusted' && steps.release_info.outputs.winget_enabled == 'true' }}
+        continue-on-error: true
+        shell: pwsh
+        env:
+          WINGET_PAT: ${{ secrets.WINGET_PAT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $toolPath = Join-Path $env:RUNNER_TEMP 'wingetcreate.exe'
+          Invoke-WebRequest -Uri 'https://aka.ms/wingetcreate/latest' -OutFile $toolPath
+          $baseUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:RELEASE_TAG"
+          $x64Url = "$baseUrl/ItsycalForWindows_$($env:PACKAGE_VERSION)_x64.msix"
+          $arm64Url = "$baseUrl/ItsycalForWindows_$($env:PACKAGE_VERSION)_arm64.msix"
+          & $toolPath update Folieson.ItsycalForWindows --version $env:VERSION --urls "$x64Url|x64" "$arm64Url|arm64" --token $env:WINGET_PAT --submit
+          if ($LASTEXITCODE -ne 0) {
+            throw "wingetcreate update failed (exit code $LASTEXITCODE)."
+          }
