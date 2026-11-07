@@ -1,0 +1,24 @@
+# Build output
+bin/
+obj/
+AppPackages/
+BundleArtifacts/
+Generated Files/
+*.msix
+*.msixbundle
+*.appx
+*.appxupload
+*.cer
+*.pfx
+
+# IDE
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test and coverage output
+TestResults/
+coverage/
+*.coverage
