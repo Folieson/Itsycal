@@ -4,6 +4,9 @@
          the calendar logic is compiled against the same BCL/Windows SDK surface. The test
          host itself needs neither MSIX nor WinRT metadata, so those tools are turned off. -->
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <!-- Must match the extension's projection package; otherwise referencing its
+         Microsoft.Windows.SDK.NET.dll fails with NETSDK1148. -->
+    <WindowsSdkPackageVersion>10.0.26100.68-preview</WindowsSdkPackageVersion>
     <RootNamespace>ItsycalForWindows.Tests</RootNamespace>
     <AssemblyName>ItsycalForWindows.Tests</AssemblyName>
     <Nullable>enable</Nullable>
