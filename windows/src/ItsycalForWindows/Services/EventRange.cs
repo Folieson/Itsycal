@@ -36,35 +36,19 @@ public static class EventRange
     }
 
     /// <summary>
-    /// Returns the first and last local dates that <paramref name="calendarEvent"/> touches, or
-    /// <c>null</c> when it touches no day at all (a zero-length event exactly at midnight).
+    /// Returns the first and last local dates that <paramref name="calendarEvent"/> touches.
+    /// The day span is derived from the event's local calendar dates
+    /// (<see cref="CalendarEvent.StartDate"/> and <see cref="CalendarEvent.EndDateInclusive"/>),
+    /// which is the single source of truth shared with the calendar grid; it stays correct
+    /// across daylight-saving changes and for all-day events.
     /// </summary>
     /// <param name="calendarEvent">Event to inspect.</param>
     public static (DateOnly FirstDay, DateOnly LastDay)? GetLocalDaySpan(CalendarEvent calendarEvent)
     {
         ArgumentNullException.ThrowIfNull(calendarEvent);
 
-        var firstDay = DateOnly.FromDateTime(calendarEvent.Start.ToLocalTime().DateTime);
-
-        DateOnly lastDay;
-        if (calendarEvent.IsAllDay)
-        {
-            // All-day events are stored as whole days (midnight start, duration in days).
-            // Deriving the day count from the duration keeps the span stable across daylight
-            // saving changes, where a one-day event can be 23 or 25 hours of wall-clock time.
-            var dayCount = (int)Math.Round(
-                (calendarEvent.End - calendarEvent.Start).TotalDays,
-                MidpointRounding.AwayFromZero);
-            lastDay = firstDay.AddDays(Math.Max(1, dayCount) - 1);
-        }
-        else
-        {
-            var end = calendarEvent.End.ToLocalTime();
-            var endDay = DateOnly.FromDateTime(end.DateTime);
-
-            // A timed event that ends exactly at midnight stops at the end of the previous day.
-            lastDay = end.TimeOfDay == TimeSpan.Zero ? endDay.AddDays(-1) : endDay;
-        }
+        var firstDay = calendarEvent.StartDate;
+        var lastDay = calendarEvent.EndDateInclusive;
 
         return lastDay < firstDay ? null : (firstDay, lastDay);
     }

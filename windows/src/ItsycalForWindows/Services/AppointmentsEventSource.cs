@@ -134,7 +134,7 @@ internal sealed class AppointmentsEventSource : IEventSource
         return MapAppointments(appointments, fromInclusive, toExclusive);
     }
 
-    private static IReadOnlyList<CalendarEvent> MapAppointments(
+    private static List<CalendarEvent> MapAppointments(
         IReadOnlyList<Appointment> appointments,
         DateOnly fromInclusive,
         DateOnly toExclusive)

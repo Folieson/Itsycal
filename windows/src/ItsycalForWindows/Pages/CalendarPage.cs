@@ -352,7 +352,7 @@ internal sealed partial class CalendarPage : ContentPage
         bool showWeekNumbers,
         bool showLoading)
     {
-        var eventCounts = BuildEventCounts(events, month.VisibleStart, month.VisibleEndExclusive);
+        var eventCounts = EventRange.CountPerDay(events, month.VisibleStart, month.VisibleEndExclusive);
         var gridMonth = eventCounts.Count == 0 ? month : month.WithEventCounts(eventCounts);
 
         var body = new JsonArray
@@ -372,7 +372,14 @@ internal sealed partial class CalendarPage : ContentPage
             body.Add((JsonNode)BuildWeekRow(week, showWeekNumbers));
         }
 
-        AddEventsSection(body, events, showLoading);
+        // The event source may return events that started before the visible range (its query
+        // uses a lookback for multi-day events), so clip before rendering the list.
+        var visibleEvents = events
+            .Select(item => EventRange.ClipToRange(item, month.VisibleStart, month.VisibleEndExclusive))
+            .OfType<CalendarEvent>()
+            .OrderBy(item => item.Start)
+            .ToList();
+        AddEventsSection(body, visibleEvents, showLoading);
 
         var card = new JsonObject
         {
@@ -452,7 +459,7 @@ internal sealed partial class CalendarPage : ContentPage
         };
     }
 
-    private static void AddEventsSection(JsonArray body, IReadOnlyList<CalendarEvent> events, bool showLoading)
+    private static void AddEventsSection(JsonArray body, List<CalendarEvent> events, bool showLoading)
     {
         body.Add((JsonNode)TextBlock(EventsHeading, size: "medium", weight: "bolder", spacing: "medium", wrap: true));
 
@@ -499,36 +506,6 @@ internal sealed partial class CalendarPage : ContentPage
         return start == end
             ? start.ToString("MMM d", culture)
             : $"{start.ToString("MMM d", culture)}\u2013{end.ToString("MMM d", culture)}";
-    }
-
-    /// <summary>
-    /// Counts, for every visible day, how many events overlap it. An event covers its start
-    /// day through its inclusive end day (<see cref="CalendarEvent.EndDateInclusive"/>),
-    /// clamped to the visible range.
-    /// </summary>
-    private static Dictionary<DateOnly, int> BuildEventCounts(
-        IReadOnlyList<CalendarEvent> events,
-        DateOnly fromInclusive,
-        DateOnly toExclusive)
-    {
-        var counts = new Dictionary<DateOnly, int>();
-        if (events.Count == 0)
-        {
-            return counts;
-        }
-
-        var lastVisibleDay = toExclusive.AddDays(-1);
-        foreach (var item in events)
-        {
-            var start = item.StartDate < fromInclusive ? fromInclusive : item.StartDate;
-            var end = item.EndDateInclusive > lastVisibleDay ? lastVisibleDay : item.EndDateInclusive;
-            for (var day = start; day <= end; day = day.AddDays(1))
-            {
-                counts[day] = counts.TryGetValue(day, out var count) ? count + 1 : 1;
-            }
-        }
-
-        return counts;
     }
 
     private static JsonObject BuildNavigationAction(string title, string action, string id) => new()

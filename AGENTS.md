@@ -109,5 +109,7 @@ and docs.
 - Target framework: `net10.0-windows10.0.26100.0`; platform `x64` (ARM64 kept in config).
 - Command Palette SDK: `Microsoft.CommandPalette.Extensions` 0.11.x (PowerToys 0.102).
 - CI: `.github/workflows/windows-build.yml` (windows-latest, .NET 10, build + scaffold
-  check).
+  check). Every run uploads the signed `itsycal-for-windows-dev` artifact (MSIX + `.cer`).
+- Install: elevated `scripts/deploy-local.ps1 -MsixPath <msix> -CertPath <cer>`; the script
+  trusts the development certificate machine-wide and restarts Command Palette.
 - Commit identity: repository-local `user.name` / `user.email` (GitHub noreply).
