@@ -5,15 +5,15 @@ on:
     branches: [master, main]
     paths:
       - 'windows/**'
-      - 'scripts/**'
-      - '.agents/**'
+      - 'docs/**'
+      - 'README.md'
       - 'AGENTS.md'
       - '.github/workflows/windows-build.yml'
   pull_request:
     paths:
       - 'windows/**'
-      - 'scripts/**'
-      - '.agents/**'
+      - 'docs/**'
+      - 'README.md'
       - 'AGENTS.md'
       - '.github/workflows/windows-build.yml'
 
